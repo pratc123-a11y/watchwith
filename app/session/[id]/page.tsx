@@ -87,6 +87,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }
 
   const allVoted = films.length > 0 && films.every(f => votes[f.id] !== undefined && votes[f.id] !== null)
+
   if (done) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
@@ -104,16 +105,21 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             </div>
           ))}
         </div>
+        <a
+          href={`/session/${id}/results`}
+          className="w-full bg-purple-700 text-white py-3 rounded-xl text-sm mb-3 font-medium text-center block"
+        >
+          See group results
+        </a>
         <button
           onClick={copyLink}
-          className="w-full border border-gray-200 py-3 rounded-xl text-sm mb-3"
+          className="w-full border border-gray-200 py-3 rounded-xl text-sm mt-3"
         >
-          {copied ? '✓ Link copied!' : 'Copy invite link'}
+          {copied ? 'Link copied!' : 'Copy invite link'}
         </button>
       </main>
     )
   }
-
   if (!joined) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
@@ -144,18 +150,17 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           onClick={joinSession}
           className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium"
         >
-          Join session →
+          Join session
         </button>
         <button
           onClick={copyLink}
           className="w-full border border-gray-200 py-3 rounded-xl text-sm mt-3"
         >
-          {copied ? '✓ Link copied!' : 'Copy invite link'}
+          {copied ? 'Link copied!' : 'Copy invite link'}
         </button>
       </main>
     )
   }
-
   return (
     <main className="min-h-screen p-8 max-w-lg mx-auto">
       <h1 className="text-2xl font-medium mb-1">Hey {name}!</h1>
@@ -197,9 +202,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                           onMouseLeave={() => setHoveredStar(null)}
                           className="absolute right-0 top-0 w-1/2 h-full z-10 opacity-0"
                         />
-                        <span
-                          className="absolute inset-0 flex items-center justify-center text-lg pointer-events-none select-none text-gray-300"
-                        >
+                        <span className="absolute inset-0 flex items-center justify-center text-lg pointer-events-none select-none text-gray-300">
                           ★
                         </span>
                         {(fullActive || halfActive) && (
@@ -249,7 +252,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           onClick={submitVotes}
           className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium"
         >
-          Submit my votes →
+          Submit my votes
         </button>
       )}
     </main>
