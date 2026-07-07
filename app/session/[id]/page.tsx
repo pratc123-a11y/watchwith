@@ -27,6 +27,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [copied, setCopied] = useState(false)
   const [films, setFilms] = useState<Film[]>([])
   const [hoveredStar, setHoveredStar] = useState<{filmId: number, star: number} | null>(null)
+  const [mode, setMode] = useState<'rated' | 'unseen' | null>(null)
 
   useEffect(() => {
     fetchParticipants()
@@ -34,22 +35,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }, [])
 
   async function fetchFilms() {
-    const page = Math.floor(Math.random() * 5) + 1
-    const res = await fetch(
-      `https://api.themoviedb.org/3/movie/top_rated?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&page=${page}`
-    )
-    const data = await res.json()
-    const shuffled = data.results
-      .filter((f: any) => f.poster_path)
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 12)
-      .map((f: any) => ({
-        id: f.id,
-        title: f.title,
-        year: f.release_date?.slice(0, 4),
-        poster: f.poster_path
-      }))
-    setFilms(shuffled)
+    const { data } = await supabase
+      .from('sessions')
+      .select('film_list')
+      .eq('id', id)
+      .single()
+    if (data?.film_list) setFilms(data.film_list)
   }
 
   async function fetchParticipants() {
@@ -61,7 +52,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }
 
   async function joinSession() {
-    if (!name.trim()) return
+    if (!name.trim() || !mode) return
     setJoined(true)
   }
 
@@ -73,7 +64,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     const { data, error } = await supabase.from('participants').insert({
       session_id: id,
       name: name,
-      votes: votes
+      votes: votes,
+      mode: mode
     })
     console.log('insert result:', data, error)
     setDone(true)
@@ -113,22 +105,23 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         </a>
         <button
           onClick={copyLink}
-          className="w-full border border-gray-200 py-3 rounded-xl text-sm mt-3"
+          className="w-full border border-gray-400 text-gray-100 py-3 rounded-xl text-sm mt-3"
         >
           {copied ? 'Link copied!' : 'Copy invite link'}
         </button>
       </main>
     )
   }
+
   if (!joined) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
         <h1 className="text-2xl font-medium mb-2">You're invited!</h1>
-        <p className="text-gray-500 mb-8">Enter your name to join this movie night session.</p>
+        <p className="text-gray-200 mb-8">Enter your name to join this movie night session.</p>
         <div className="bg-gray-800 rounded-xl p-4 mb-6">
           <p className="text-sm font-medium mb-3 text-white">Who's joined so far ({participants.length})</p>
           {participants.length === 0 && (
-            <p className="text-sm text-gray-400">Nobody yet — be the first!</p>
+            <p className="text-sm text-gray-200">Nobody yet — be the first!</p>
           )}
           {participants.map(p => (
             <div key={p.id} className="flex items-center gap-2 mb-2">
@@ -144,23 +137,48 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="Your name"
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 mb-4 outline-none focus:border-gray-400"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 mb-6 outline-none focus:border-gray-400"
         />
+        <p className="text-sm font-medium text-white mb-3">What are you looking for tonight?</p>
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setMode('rated')}
+            className={`flex-1 py-2 rounded-xl border text-sm transition-all ${
+              mode === 'rated'
+                ? 'bg-purple-700 text-white border-purple-700'
+                : 'border-gray-600 text-gray-100'
+            }`}
+          >
+            🌟 Something we love
+          </button>
+          <button
+            onClick={() => setMode('unseen')}
+            className={`flex-1 py-2 rounded-xl border text-sm transition-all ${
+              mode === 'unseen'
+                ? 'bg-purple-700 text-white border-purple-700'
+                : 'border-gray-600 text-gray-100'
+            }`}
+          >
+            🎲 Surprise us
+          </button>
+        </div>
         <button
           onClick={joinSession}
-          className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium"
+          disabled={!mode || !name.trim()}
+          className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium disabled:opacity-40 mb-3"
         >
           Join session
         </button>
         <button
           onClick={copyLink}
-          className="w-full border border-gray-200 py-3 rounded-xl text-sm mt-3"
+          className="w-full border border-gray-400 text-gray-100 py-3 rounded-xl text-sm"
         >
           {copied ? 'Link copied!' : 'Copy invite link'}
         </button>
       </main>
     )
   }
+
   return (
     <main className="min-h-screen p-8 max-w-lg mx-auto">
       <h1 className="text-2xl font-medium mb-1">Hey {name}!</h1>

@@ -25,8 +25,10 @@ type Participant = {
 type FilmResult = {
   film: Film
   score: number
+  groupScore: number
   breakdown: { name: string, vote: number }[]
   lowestScore: number
+  watchLaterCount: number
   explanation: string
 }
 
@@ -44,13 +46,14 @@ async function generateExplanation(film: Film, breakdown: { name: string, vote: 
     const topFans = ratedPeople.filter(b => b.vote >= 4).map(b => b.name)
     const genres = film.genres.join(', ')
     
-    const prompt = `A group is picking a movie. "${film.title}" (${film.year}) got an average score of ${score}/5. 
+    const lowestVote = Math.min(...ratedPeople.map(b => b.vote))
+    const prompt = `A group is picking a movie together. "${film.title}" (${film.year}).
 Genres: ${genres}.
-Voters: ${ratedPeople.map(b => `${b.name} gave it ${b.vote}/5`).join(', ')}.
-${topFans.length > 0 ? `Top fans: ${topFans.join(' and ')} really loved it.` : ''}
+Individual scores: ${ratedPeople.map(b => `${b.name} gave it ${b.vote}/5`).join(', ')}.
+Lowest score in group: ${lowestVote}/5.
+${topFans.length > 0 ? `${topFans.join(' and ')} loved it most.` : ''}
 
-Write ONE short sentence (max 20 words) explaining why this is a good match for the group. Be specific about who liked it and why based on the genres. Don't start with "This".`
-
+Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP — not just one person. Focus on what the group has in common. Don't start with "This".`
     try {
       const res = await fetch('/api/explain', {
       method: 'POST',
@@ -124,21 +127,28 @@ Write ONE short sentence (max 20 words) explaining why this is a good match for 
       if (ratedVotes.length === 0) continue
 
       const avgScore = totalScore / ratedVotes.length
+      const watchLaterCount = breakdown.filter(b => b.vote === -1).length
+      const groupSize = participantData.length
+      const ratedCount = ratedVotes.length
+
+      const groupScore = (
+        (lowestScore * 0.5) +
+        (avgScore * 0.3) +
+        ((ratedCount / groupSize) * 5 * 0.2)
+      )
 
       scored.push({
         film,
         score: Math.round(avgScore * 10) / 10,
+        groupScore: Math.round(groupScore * 10) / 10,
         breakdown,
         lowestScore,
+        watchLaterCount,
         explanation: ''
       })
     }
 
-    scored.sort((a, b) => {
-      const leastMisery = b.lowestScore - a.lowestScore
-      if (leastMisery !== 0) return leastMisery
-      return b.score - a.score
-    })
+    scored.sort((a, b) => b.groupScore - a.groupScore)
 
     const top5 = scored.slice(0, 5)
 
@@ -225,24 +235,24 @@ return (
               <div className="flex items-center gap-2 mb-3">
                 <div className="flex">{renderStars(result.score)}</div>
                 <span className="text-sm text-gray-300">{result.score} avg</span>
+                <span className="text-xs text-purple-400 ml-auto">
+                  {result.groupScore} group score
+                </span>
               </div>
               {result.explanation && (
-                <p className="text-xs text-gray-300 italic mb-3 leading-relaxed">{result.explanation}</p>
+                <p className="text-xs text-white italic mb-3 leading-relaxed">{result.explanation}</p>
               )}
-              <div className="flex flex-col gap-1">
-                {result.breakdown.map(b => (
-                  <div key={b.name} className="flex items-center justify-between">
-                    <span className="text-xs text-gray-300">{b.name}</span>
-                    {b.vote === -1 ? (
-                      <span className="text-xs text-blue-400">🕐 Watch later</span>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <div className="flex">{renderStars(b.vote)}</div>
-                        <span className="text-xs text-gray-300">{b.vote}</span>
-                      </div>
-                    )}
-                  </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+                {result.breakdown.filter(b => b.vote > 0).map(b => (
+                  <span key={b.name} className="text-xs bg-gray-700 text-gray-200 px-2 py-0.5 rounded-full">
+                    {b.name} {b.vote}★
+                  </span>
                 ))}
+                {result.watchLaterCount > 0 && (
+                  <span className="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full">
+                    🕐 {result.watchLaterCount} watch later
+                  </span>
+                )}
               </div>
             </div>
           </div>
