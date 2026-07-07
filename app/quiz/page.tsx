@@ -52,7 +52,7 @@ export default function Quiz() {
             <p className="font-medium mb-3">{group.label} ({group.films.length})</p>
             <div className="flex flex-wrap gap-2">
               {group.films.map(f => (
-               <span key={f.id} className="text-sm bg-gray-700 text-white rounded-full px-3 py-1">{f.title}</span>
+                <span key={f.id} className="text-sm bg-gray-700 text-white rounded-full px-3 py-1">{f.title}</span>
               ))}
             </div>
           </div>
