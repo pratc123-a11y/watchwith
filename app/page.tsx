@@ -33,7 +33,7 @@ export default function Home() {
       </p>
       <button
         onClick={createSession}
-        className="w-full bg-black text-white px-6 py-3 rounded-xl font-medium mb-3"
+        className="w-full bg-purple-700 text-white px-6 py-3 rounded-xl font-medium mb-3"
       >
         Start a session →
       </button>

@@ -8,29 +8,14 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-const FILMS = [
-  { id: 27205, title: 'Inception', year: '2010', poster: '/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg' },
-  { id: 155, title: 'The Dark Knight', year: '2008', poster: '/qJ2tW6WMUDux911r6m7haRef0WH.jpg' },
-  { id: 680, title: 'Pulp Fiction', year: '1994', poster: '/d5iIlFn5s0ImszYzBPb8JPIfbXD.jpg' },
-  { id: 13, title: 'Forrest Gump', year: '1994', poster: '/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg' },
-  { id: 120, title: 'The Lord of the Rings', year: '2001', poster: '/6oom5QYQ2yQTMJIbnvbkBL9cHo6.jpg' },
-  { id: 603, title: 'The Matrix', year: '1999', poster: '/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg' },
-  { id: 289, title: 'Casablanca', year: '1942', poster: '/5K7cOHoay2mZusSLezBOY0Qxh8a.jpg' },
-  { id: 129, title: 'Spirited Away', year: '2001', poster: '/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg' },
-  { id: 389, title: '12 Angry Men', year: '1957', poster: '/ppd84D2i9W8jXmsyInGyihiSyqz.jpg' },
-  { id: 637, title: 'Life is Beautiful', year: '1997', poster: '/74hLDKjD5aGYOotO6esUVaeISa2.jpg' },
-  { id: 424, title: "Schindler's List", year: '1993', poster: '/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg' },
-  { id: 98, title: 'Gladiator', year: '2000', poster: '/ty8TGRuvJLPUmAR1H1nRIsgwvim.jpg' },
-]
+type Film = {
+  id: number
+  title: string
+  year: string
+  poster: string
+}
 
-type Vote = 'loved' | 'meh' | 'no' | 'unseen' | null
-
-const VOTE_OPTIONS = [
-  { value: 'loved', emoji: '❤️', active: 'bg-green-100 border-green-300 text-green-700' },
-  { value: 'meh', emoji: '😐', active: 'bg-yellow-100 border-yellow-300 text-yellow-700' },
-  { value: 'no', emoji: '👎', active: 'bg-red-100 border-red-300 text-red-700' },
-  { value: 'unseen', emoji: '👀', active: 'bg-blue-100 border-blue-300 text-blue-700' },
-]
+type Vote = number | null
 
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params)
@@ -40,10 +25,32 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [done, setDone] = useState(false)
   const [participants, setParticipants] = useState<any[]>([])
   const [copied, setCopied] = useState(false)
+  const [films, setFilms] = useState<Film[]>([])
+  const [hoveredStar, setHoveredStar] = useState<{filmId: number, star: number} | null>(null)
 
   useEffect(() => {
     fetchParticipants()
+    fetchFilms()
   }, [])
+
+  async function fetchFilms() {
+    const page = Math.floor(Math.random() * 5) + 1
+    const res = await fetch(
+      `https://api.themoviedb.org/3/movie/top_rated?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&page=${page}`
+    )
+    const data = await res.json()
+    const shuffled = data.results
+      .filter((f: any) => f.poster_path)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 12)
+      .map((f: any) => ({
+        id: f.id,
+        title: f.title,
+        year: f.release_date?.slice(0, 4),
+        poster: f.poster_path
+      }))
+    setFilms(shuffled)
+  }
 
   async function fetchParticipants() {
     const { data } = await supabase
@@ -58,8 +65,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     setJoined(true)
   }
 
-  function vote(id: number, value: Vote) {
-    setVotes(prev => ({ ...prev, [id]: value }))
+  function vote(filmId: number, stars: number) {
+    setVotes(prev => ({ ...prev, [filmId]: stars }))
   }
 
   async function submitVotes() {
@@ -79,8 +86,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const allVoted = FILMS.every(f => votes[f.id])
-
+  const allVoted = films.length > 0 && films.every(f => votes[f.id] !== undefined && votes[f.id] !== null)
   if (done) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
@@ -136,7 +142,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         />
         <button
           onClick={joinSession}
-          className="w-full bg-black text-white py-3 rounded-xl font-medium"
+          className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium"
         >
           Join session →
         </button>
@@ -154,41 +160,94 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     <main className="min-h-screen p-8 max-w-lg mx-auto">
       <h1 className="text-2xl font-medium mb-1">Hey {name}!</h1>
       <p className="text-gray-500 mb-2">Rate these films honestly</p>
-      <p className="text-sm text-gray-400 mb-8">{Object.keys(votes).length} of {FILMS.length} rated</p>
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        {FILMS.map(film => (
-          <div key={film.id} className="rounded-xl overflow-hidden border border-gray-100">
-            <img
-              src={`https://image.tmdb.org/t/p/w300${film.poster}`}
-              alt={film.title}
-              className="w-full"
-            />
-            <div className="p-2">
-              <p className="text-xs font-medium mb-1 leading-tight">{film.title}</p>
-              <p className="text-xs text-gray-400 mb-2">{film.year}</p>
-              <div className="flex gap-1">
-                {VOTE_OPTIONS.map(opt => (
+      <p className="text-sm text-gray-400 mb-8">{Object.keys(votes).length} of {films.length} rated</p>
+      {films.length === 0 ? (
+        <div className="text-center text-gray-400 py-16">Loading films...</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 mb-8">
+          {films.map(film => (
+            <div key={film.id} className="rounded-xl overflow-hidden border border-gray-100">
+              <img
+                src={`https://image.tmdb.org/t/p/w300${film.poster}`}
+                alt={film.title}
+                className="w-full"
+              />
+              <div className="p-2">
+                <p className="text-xs font-medium mb-1 leading-tight">{film.title}</p>
+                <p className="text-xs text-gray-400 mb-2">{film.year}</p>
+                <div className="flex justify-center gap-0 py-1">
+                  {[1,2,3,4,5].map(star => {
+                    const currentVal = hoveredStar?.filmId === film.id
+                      ? hoveredStar.star
+                      : (votes[film.id] ?? 0)
+                    const isNegative = currentVal === -1 || currentVal === -2
+                    const fullActive = !isNegative && star <= currentVal
+                    const halfActive = !isNegative && star - 0.5 === currentVal
+                    return (
+                      <div key={star} className="relative" style={{width: '22px', height: '22px'}}>
+                        <button
+                          onClick={() => vote(film.id, star - 0.5)}
+                          onMouseEnter={() => setHoveredStar({ filmId: film.id, star: star - 0.5 })}
+                          onMouseLeave={() => setHoveredStar(null)}
+                          className="absolute left-0 top-0 w-1/2 h-full z-10 opacity-0"
+                        />
+                        <button
+                          onClick={() => vote(film.id, star)}
+                          onMouseEnter={() => setHoveredStar({ filmId: film.id, star })}
+                          onMouseLeave={() => setHoveredStar(null)}
+                          className="absolute right-0 top-0 w-1/2 h-full z-10 opacity-0"
+                        />
+                        <span
+                          className="absolute inset-0 flex items-center justify-center text-lg pointer-events-none select-none text-gray-300"
+                        >
+                          ★
+                        </span>
+                        {(fullActive || halfActive) && (
+                          <span
+                            className="absolute inset-0 flex items-center justify-center text-lg pointer-events-none select-none text-yellow-400 overflow-hidden"
+                            style={{ clipPath: halfActive ? 'inset(0 50% 0 0)' : 'none' }}
+                          >
+                            ★
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                {votes[film.id] !== undefined && votes[film.id]! > 0 && (
+                  <p className="text-center text-xs text-gray-400 mb-1">{votes[film.id]}★</p>
+                )}
+                <div className="flex justify-center gap-1 mt-1">
                   <button
-                    key={opt.value}
-                    onClick={() => vote(film.id, opt.value as Vote)}
-                    className={`flex-1 text-xs py-1 rounded-lg border transition-all ${
-                      votes[film.id] === opt.value
-                        ? opt.active
+                    onClick={() => vote(film.id, -1)}
+                    className={`text-xs px-1.5 py-0.5 rounded border transition-all ${
+                      votes[film.id] === -1
+                        ? 'bg-blue-100 border-blue-300 text-blue-700'
                         : 'border-gray-200 text-gray-400'
                     }`}
                   >
-                    {opt.emoji}
+                    🕐 Watch later
                   </button>
-                ))}
+                  <button
+                    onClick={() => vote(film.id, -2)}
+                    className={`text-xs px-1.5 py-0.5 rounded border transition-all ${
+                      votes[film.id] === -2
+                        ? 'bg-red-100 border-red-300 text-red-700'
+                        : 'border-gray-200 text-gray-400'
+                    }`}
+                  >
+                    ❌ Not interested
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
       {allVoted && (
         <button
           onClick={submitVotes}
-          className="w-full bg-black text-white py-3 rounded-xl font-medium"
+          className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium"
         >
           Submit my votes →
         </button>
