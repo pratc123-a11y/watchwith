@@ -14,12 +14,15 @@ type Film = {
   year: string
   poster: string
   genres: string[]
+  director: string
+  tmdbRating: number
 }
 
 type Participant = {
   id: string
   name: string
   votes: Record<string, number>
+  mode: string
 }
 
 type FilmResult = {
@@ -37,36 +40,146 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [results, setResults] = useState<FilmResult[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)
+  const [sessionMode, setSessionMode] = useState<string | null>(null)
 
   useEffect(() => {
     fetchAndScore()
   }, [])
-async function generateExplanation(film: Film, breakdown: { name: string, vote: number }[], score: number): Promise<string> {
+
+  async function generateExplanation(film: Film, breakdown: { name: string, vote: number }[], score: number): Promise<string> {
     const ratedPeople = breakdown.filter(b => b.vote > 0)
     const topFans = ratedPeople.filter(b => b.vote >= 4).map(b => b.name)
     const genres = film.genres.join(', ')
-    
-    const lowestVote = Math.min(...ratedPeople.map(b => b.vote))
-    const prompt = `A group is picking a movie together. "${film.title}" (${film.year}).
+    const lowestVote = ratedPeople.length > 0 ? Math.min(...ratedPeople.map(b => b.vote)) : 0
+    const prompt = sessionMode === 'unseen'
+      ? `A group wants to discover a new film. "${film.title}" (${film.year}).
+Genres: ${genres}.
+Write ONE sentence (max 20 words) explaining why this would be a great new discovery for the group based on its genres. Don't start with "This".`
+      : `A group is picking a movie together. "${film.title}" (${film.year}).
 Genres: ${genres}.
 Individual scores: ${ratedPeople.map(b => `${b.name} gave it ${b.vote}/5`).join(', ')}.
 Lowest score in group: ${lowestVote}/5.
 ${topFans.length > 0 ? `${topFans.join(' and ')} loved it most.` : ''}
+Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP. Focus on what the group has in common. Don't start with "This".`
 
-Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP — not just one person. Focus on what the group has in common. Don't start with "This".`
     try {
       const res = await fetch('/api/explain', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
-    })
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      })
       const data = await res.json()
       return data.content?.[0]?.text || ''
     } catch {
       return ''
     }
   }
+
+  async function getGroupGenrePreferences(participantData: Participant[]): Promise<string[]> {
+    const genreCounts: Record<string, number> = {}
+    const seenFilmIds = new Set<string>()
+
+    for (const p of participantData) {
+      for (const [filmId, vote] of Object.entries(p.votes)) {
+        if (vote > 0) {
+          seenFilmIds.add(filmId)
+          const res = await fetch(
+            `https://api.themoviedb.org/3/movie/${filmId}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
+          )
+          const data = await res.json()
+          const genres: string[] = data.genres?.map((g: any) => g.name) || []
+          genres.forEach(g => {
+            genreCounts[g] = (genreCounts[g] || 0) + vote
+          })
+        }
+      }
+    }
+
+    return Object.entries(genreCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([genre]) => genre)
+  }
+
+  async function fetchSurpriseFilms(participantData: Participant[]): Promise<FilmResult[]> {
+    const topGenres = await getGroupGenrePreferences(participantData)
+
+    const seenFilmIds = new Set<string>()
+    participantData.forEach(p => {
+      Object.keys(p.votes).forEach(fid => seenFilmIds.add(fid))
+    })
+
+    const genreMap: Record<string, number> = {
+      'Action': 28, 'Adventure': 12, 'Animation': 16, 'Comedy': 35,
+      'Crime': 80, 'Documentary': 99, 'Drama': 18, 'Family': 10751,
+      'Fantasy': 14, 'Horror': 27, 'Music': 10402, 'Mystery': 9648,
+      'Romance': 10749, 'Science Fiction': 878, 'Thriller': 53,
+      'War': 10752, 'Western': 37
+    }
+
+    const topGenreIds = topGenres
+      .map(g => genreMap[g])
+      .filter(Boolean)
+      .join(',')
+
+    const res = await fetch(
+      `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&with_genres=${topGenreIds}&sort_by=vote_average.desc&vote_count.gte=1000&page=1`
+    )
+    const data = await res.json()
+
+    const freshFilms = data.results
+      .filter((f: any) => f.poster_path && !seenFilmIds.has(String(f.id)))
+      .slice(0, 5)
+
+    const filmDetails = await Promise.all(
+      freshFilms.map(async (f: any) => {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/movie/${f.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
+        )
+        const data = await res.json()
+        const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+        return {
+          id: data.id,
+          title: data.title,
+          year: data.release_date?.slice(0, 4),
+          poster: data.poster_path,
+          genres: data.genres?.map((g: any) => g.name) || [],
+          director,
+          tmdbRating: Math.round(data.vote_average * 10) / 10
+        } as Film
+      })
+    )
+
+    const surpriseResults: FilmResult[] = filmDetails.map(film => ({
+      film,
+      score: 0,
+      groupScore: 0,
+      breakdown: [],
+      lowestScore: 0,
+      watchLaterCount: 0,
+      explanation: ''
+    }))
+
+    const withExplanations = await Promise.all(
+      surpriseResults.map(async result => ({
+        ...result,
+        explanation: await generateExplanation(result.film, [], 0)
+      }))
+    )
+
+    return withExplanations
+  }
+
   async function fetchAndScore() {
+    const { data: sessionData } = await supabase
+      .from('sessions')
+      .select('mode')
+      .eq('id', id)
+      .single()
+
+    const mode = sessionData?.mode || 'rated'
+    setSessionMode(mode)
+
     const { data: participantData } = await supabase
       .from('participants')
       .select('*')
@@ -79,26 +192,35 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP 
 
     setParticipants(participantData)
 
+    if (mode === 'unseen') {
+      const surpriseResults = await fetchSurpriseFilms(participantData)
+      setResults(surpriseResults)
+      setLoading(false)
+      return
+    }
     const allFilmIds = new Set<string>()
     participantData.forEach(p => {
       Object.keys(p.votes).forEach(fid => allFilmIds.add(fid))
     })
 
     const filmDetails = await Promise.all(
-        Array.from(allFilmIds).map(async fid => {
-          const res = await fetch(
-            `https://api.themoviedb.org/3/movie/${fid}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}`
-          )
-          const data = await res.json()
-          return {
-            id: data.id,
-            title: data.title,
-            year: data.release_date?.slice(0, 4),
-            poster: data.poster_path,
-            genres: data.genres?.map((g: any) => g.name) || []
-          } as Film
-        })
-      )
+      freshFilms.map(async (f: any) => {
+        const res = await fetch(
+          `https://api.themoviedb.org/3/movie/${f.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
+        )
+        const data = await res.json()
+        const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+        return {
+          id: data.id,
+          title: data.title,
+          year: data.release_date?.slice(0, 4),
+          poster: data.poster_path,
+          genres: data.genres?.map((g: any) => g.name) || [],
+          director,
+          tmdbRating: Math.round(data.vote_average * 10) / 10
+        } as Film
+      })
+    )
 
     const scored: FilmResult[] = []
 
@@ -131,11 +253,9 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP 
       const groupSize = participantData.length
       const ratedCount = ratedVotes.length
 
-      const groupScore = (
-        (lowestScore * 0.5) +
-        (avgScore * 0.3) +
-        ((ratedCount / groupSize) * 5 * 0.2)
-      )
+      const groupScore = ratedVotes.every(v => v.vote >= 3)
+        ? avgScore
+        : avgScore * (lowestScore / 5)
 
       scored.push({
         film,
@@ -186,7 +306,11 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP 
   if (loading) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
-        <p className="text-gray-400 mt-16">Calculating best matches...</p>
+        <p className="text-gray-400 mt-16">
+          {sessionMode === 'unseen'
+            ? 'Finding something new for your group...'
+            : 'Calculating best matches...'}
+        </p>
       </main>
     )
   }
@@ -200,16 +324,25 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP 
     )
   }
 
-return (
+  return (
     <main className="min-h-screen p-8 max-w-md mx-auto">
-      <h1 className="text-2xl font-medium mb-1">Best matches</h1>
+      <h1 className="text-2xl font-medium mb-1">
+        {sessionMode === 'unseen' ? 'Something new to discover' : 'Best matches'}
+      </h1>
       <p className="text-gray-100 mb-2">
         Based on {participants.length} {participants.length === 1 ? 'person' : 'people'} —{' '}
         {participants.map(p => p.name).join(', ')}
       </p>
-      <p className="text-xs text-gray-200 mb-8">
-        Ranked by lowest score in the group first, then average — so nobody gets a film they'll hate.
-      </p>
+      {sessionMode === 'unseen' && (
+        <p className="text-xs text-gray-200 mb-4">
+          Picked based on your group's favourite genres — none of you have rated these before.
+        </p>
+      )}
+      {sessionMode === 'rated' && (
+        <p className="text-xs text-gray-200 mb-8">
+          Ranked so nobody gets a film they'll hate.
+        </p>
+      )}
 
       {results.map((result, i) => (
         <div
@@ -227,33 +360,47 @@ return (
             <div className="flex-1">
               {i === 0 && (
                 <span className="text-xs bg-purple-700 text-purple-100 px-2 py-0.5 rounded-full mb-2 inline-block">
-                  Best match
+                  {sessionMode === 'unseen' ? 'Top pick' : 'Best match'}
                 </span>
               )}
               <h2 className="font-medium text-base leading-tight mb-1 text-white">{result.film.title}</h2>
-              <p className="text-xs text-gray-300 mb-2">{result.film.year}</p>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="flex">{renderStars(result.score)}</div>
-                <span className="text-sm text-gray-300">{result.score} avg</span>
-                <span className="text-xs text-purple-400 ml-auto">
-                  {result.groupScore} group score
-                </span>
-              </div>
+              <p className="text-xs text-gray-300 mb-1">{result.film.year}{result.film.director ? ` · Dir. ${result.film.director}` : ''}</p>
+              {result.film.tmdbRating > 0 && (
+                <div className="flex items-center gap-1 mb-2">
+                  <span className="text-yellow-400 text-xs">★</span>
+                  <span className="text-xs text-gray-300">{result.film.tmdbRating}/10 TMDB</span>
+                </div>
+              )}
+              {result.film.genres.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {result.film.genres.slice(0, 3).map(g => (
+                    <span key={g} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">{g}</span>
+                  ))}
+                </div>
+              )}
+              {sessionMode === 'rated' && (
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex">{renderStars(result.groupScore)}</div>
+                  <span className="text-sm text-gray-300">{result.groupScore} group score</span>
+                </div>
+              )}
               {result.explanation && (
                 <p className="text-xs text-white italic mb-3 leading-relaxed">{result.explanation}</p>
               )}
-            <div className="flex flex-wrap gap-1 mt-1">
-                {result.breakdown.filter(b => b.vote > 0).map(b => (
-                  <span key={b.name} className="text-xs bg-gray-700 text-gray-200 px-2 py-0.5 rounded-full">
-                    {b.name} {b.vote}★
-                  </span>
-                ))}
-                {result.watchLaterCount > 0 && (
-                  <span className="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full">
-                    🕐 {result.watchLaterCount} watch later
-                  </span>
-                )}
-              </div>
+              {sessionMode === 'rated' && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {result.breakdown.filter(b => b.vote > 0).map(b => (
+                    <span key={b.name} className="text-xs bg-gray-700 text-gray-200 px-2 py-0.5 rounded-full">
+                      {b.name} {b.vote}★
+                    </span>
+                  ))}
+                  {result.watchLaterCount > 0 && (
+                    <span className="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full">
+                      🕐 {result.watchLaterCount} watch later
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

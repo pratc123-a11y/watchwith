@@ -28,6 +28,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [films, setFilms] = useState<Film[]>([])
   const [hoveredStar, setHoveredStar] = useState<{filmId: number, star: number} | null>(null)
   const [mode, setMode] = useState<'rated' | 'unseen' | null>(null)
+  const [sessionMode, setSessionMode] = useState<string | null>(null)
 
   useEffect(() => {
     fetchParticipants()
@@ -37,10 +38,14 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   async function fetchFilms() {
     const { data } = await supabase
       .from('sessions')
-      .select('film_list')
+      .select('film_list, mode')
       .eq('id', id)
       .single()
     if (data?.film_list) setFilms(data.film_list)
+    if (data?.mode) {
+      setSessionMode(data.mode)
+      setMode(data.mode)
+    }
   }
 
   async function fetchParticipants() {
@@ -52,7 +57,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }
 
   async function joinSession() {
-    if (!name.trim() || !mode) return
+    if (!name.trim()) return
     setJoined(true)
   }
 
@@ -139,32 +144,24 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           placeholder="Your name"
           className="w-full border border-gray-200 rounded-xl px-4 py-3 mb-6 outline-none focus:border-gray-400"
         />
-        <p className="text-sm font-medium text-white mb-3">What are you looking for tonight?</p>
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setMode('rated')}
-            className={`flex-1 py-2 rounded-xl border text-sm transition-all ${
-              mode === 'rated'
-                ? 'bg-purple-700 text-white border-purple-700'
-                : 'border-gray-600 text-gray-100'
-            }`}
-          >
-            🌟 Something we love
-          </button>
-          <button
-            onClick={() => setMode('unseen')}
-            className={`flex-1 py-2 rounded-xl border text-sm transition-all ${
-              mode === 'unseen'
-                ? 'bg-purple-700 text-white border-purple-700'
-                : 'border-gray-600 text-gray-100'
-            }`}
-          >
-            🎲 Surprise us
-          </button>
-        </div>
+        {sessionMode && (
+          <div className="flex items-center gap-2 mb-6 bg-gray-800 rounded-xl px-4 py-3">
+            <span className="text-lg">{sessionMode === 'rated' ? '🌟' : '🎲'}</span>
+            <div>
+              <p className="text-sm font-medium text-white">
+                {sessionMode === 'rated' ? 'Something we love' : 'Surprise us'}
+              </p>
+              <p className="text-xs text-gray-400">
+                {sessionMode === 'rated' 
+                  ? 'Rate films you know to find your best match'
+                  : 'Find something none of you have seen before'}
+              </p>
+            </div>
+          </div>
+        )}
         <button
           onClick={joinSession}
-          disabled={!mode || !name.trim()}
+          disabled={!name.trim()}
           className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium disabled:opacity-40 mb-3"
         >
           Join session
