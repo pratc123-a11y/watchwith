@@ -16,6 +16,7 @@ type Film = {
   genres: string[]
   director: string
   tmdbRating: number
+  streaming: {name: string, logo: string, link: string}[]
 }
 
 type Participant = {
@@ -45,6 +46,29 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     fetchAndScore()
   }, [])
+
+ async function fetchStreaming(tmdbId: number): Promise<{name: string, logo: string, link: string}[]> {
+    try {
+      const res = await fetch(`/api/streaming?tmdbId=${tmdbId}`)
+      const data = await res.json()
+      const streamingOptions = data?.streamingOptions?.au || []
+      const seen = new Set()
+      return streamingOptions
+        .filter((option: any) => {
+          if (seen.has(option.service?.id)) return false
+          seen.add(option.service?.id)
+          return true
+        })
+        .slice(0, 4)
+        .map((option: any) => ({
+          name: option.service?.name,
+          logo: option.service?.imageSet?.whiteImage,
+          link: option.link
+        }))
+    } catch {
+      return []
+    }
+  }
 
   async function generateExplanation(film: Film, breakdown: { name: string, vote: number }[], score: number): Promise<string> {
     const ratedPeople = breakdown.filter(b => b.vote > 0)
@@ -138,6 +162,7 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
         )
         const data = await res.json()
         const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+        const streaming = await fetchStreaming(data.id)
         return {
           id: data.id,
           title: data.title,
@@ -145,7 +170,8 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
           poster: data.poster_path,
           genres: data.genres?.map((g: any) => g.name) || [],
           director,
-          tmdbRating: Math.round(data.vote_average * 10) / 10
+          tmdbRating: Math.round(data.vote_average * 10) / 10,
+          streaming
         } as Film
       })
     )
@@ -204,12 +230,13 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
     })
 
     const filmDetails = await Promise.all(
-      freshFilms.map(async (f: any) => {
+      Array.from(allFilmIds).map(async fid => {
         const res = await fetch(
-          `https://api.themoviedb.org/3/movie/${f.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
+          `https://api.themoviedb.org/3/movie/${fid}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
         )
         const data = await res.json()
-        const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+       const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+        const streaming = await fetchStreaming(data.id)
         return {
           id: data.id,
           title: data.title,
@@ -217,7 +244,8 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
           poster: data.poster_path,
           genres: data.genres?.map((g: any) => g.name) || [],
           director,
-          tmdbRating: Math.round(data.vote_average * 10) / 10
+          tmdbRating: Math.round(data.vote_average * 10) / 10,
+          streaming
         } as Film
       })
     )
@@ -370,6 +398,33 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
                   <span className="text-yellow-400 text-xs">★</span>
                   <span className="text-xs text-gray-300">{result.film.tmdbRating}/10 TMDB</span>
                 </div>
+              )}
+              {result.film.streaming && result.film.streaming.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-2 items-center">
+                  {result.film.streaming.map(service => (
+                    
+                    <a
+                      key={service.name}
+                      href={service.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center bg-gray-800 rounded-lg px-2 py-1 hover:bg-gray-700 transition-all"
+                      title={service.name}
+                    >
+                      {service.logo ? (
+                        <img
+                          src={service.logo}
+                          alt={service.name}
+                          className="h-3 object-contain"
+                        />
+                      ) : (
+                        <span className="text-xs text-white">{service.name}</span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-300 mb-2">Not currently streaming in AU</p>
               )}
               {result.film.genres.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-2">
