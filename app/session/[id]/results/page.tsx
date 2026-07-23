@@ -42,6 +42,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)
   const [sessionMode, setSessionMode] = useState<string | null>(null)
+  const [sessionGenres, setSessionGenres] = useState<string[]>([])
 
   useEffect(() => {
     fetchAndScore()
@@ -199,12 +200,14 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
   async function fetchAndScore() {
     const { data: sessionData } = await supabase
       .from('sessions')
-      .select('mode')
+      .select('mode, genres')
       .eq('id', id)
       .single()
 
     const mode = sessionData?.mode || 'rated'
+    const genres: string[] = sessionData?.genres || []
     setSessionMode(mode)
+    setSessionGenres(genres)
 
     const { data: participantData } = await supabase
       .from('participants')
@@ -281,10 +284,9 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
       const groupSize = participantData.length
       const ratedCount = ratedVotes.length
 
-      const groupScore = ratedVotes.every(v => v.vote >= 3)
+     const groupScore = ratedVotes.every(v => v.vote >= 3)
         ? avgScore
         : avgScore * (lowestScore / 5)
-
       scored.push({
         film,
         score: Math.round(avgScore * 10) / 10,
@@ -367,9 +369,18 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
         </p>
       )}
       {sessionMode === 'rated' && (
-        <p className="text-xs text-gray-200 mb-8">
+        <p className="text-xs text-gray-200 mb-4">
           Ranked so nobody gets a film they'll hate.
         </p>
+      )}
+      {sessionGenres.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-8">
+          {sessionGenres.map(genre => (
+            <span key={genre} className="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full">
+              {genre}
+            </span>
+          ))}
+        </div>
       )}
 
       {results.map((result, i) => (
