@@ -225,10 +225,10 @@ export default function Home() {
         </div>
          {user ? (
           <div className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-3 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-200">Signed in as</p>
-              <p className="text-sm text-white">{user.user_metadata?.username || user.email}</p>
-            </div>
+            <a href="/profile">
+            <p className="text-xs text-gray-200">Signed in as</p>
+            <p className="text-sm text-white">{user?.user_metadata?.username || user?.email}</p>
+          </a>
             <button
               onClick={signOut}
               className="text-xs text-gray-400 hover:text-white border border-gray-700 px-3 py-1.5 rounded-lg transition-all"
