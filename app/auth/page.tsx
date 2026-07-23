@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@supabase/supabase-js'
 
@@ -13,10 +13,19 @@ export default function AuthPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        router.push('/')
+      }
+    })
+  }, [])
 
   async function handleAuth() {
     setLoading(true)
@@ -24,7 +33,11 @@ export default function AuthPage() {
     setMessage(null)
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { username } }
+      })
       if (error) setError(error.message)
       else setMessage('Check your email to confirm your account!')
     } else {
@@ -56,13 +69,22 @@ export default function AuthPage() {
           </p>
 
           <div className="flex flex-col gap-3 mb-6">
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Email address"
-              className="w-full border border-gray-700 rounded-xl px-4 py-3 outline-none focus:border-purple-500 bg-gray-800 text-white placeholder-gray-500 text-sm"
-            />
+            {isSignUp && (
+        <input
+          type="text"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          placeholder="Username"
+          className="w-full border border-gray-700 rounded-xl px-4 py-3 outline-none focus:border-purple-500 bg-gray-800 text-white placeholder-gray-500 text-sm"
+        />
+      )}
+      <input
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="Email address"
+        className="w-full border border-gray-700 rounded-xl px-4 py-3 outline-none focus:border-purple-500 bg-gray-800 text-white placeholder-gray-500 text-sm"
+      />
             <input
               type="password"
               value={password}
