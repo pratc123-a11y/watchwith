@@ -56,10 +56,37 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     if (data) setParticipants(data)
   }
 
+  async function fetchPastRatings() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: ratings } = await supabase
+      .from('user_ratings')
+      .select('film_id, rating')
+      .eq('user_id', user.id)
+
+    if (ratings && ratings.length > 0) {
+      const prefilled: Record<number, number> = {}
+      ratings.forEach(r => {
+        prefilled[Number(r.film_id)] = r.rating
+      })
+      setVotes(prev => ({ ...prefilled, ...prev }))
+    }
+  }
+
   async function joinSession() {
     if (!name.trim()) return
     setJoined(true)
+    await fetchPastRatings()
   }
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.user_metadata?.username) {
+        setName(user.user_metadata.username)
+      }
+    })
+  }, [])
 
   function vote(filmId: number, stars: number) {
     setVotes(prev => ({ ...prev, [filmId]: stars }))
@@ -73,6 +100,29 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       mode: mode
     })
     console.log('insert result:', data, error)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const ratingRows = films
+        .filter(film => votes[film.id] !== undefined && votes[film.id] !== null)
+        .map(film => ({
+          user_id: user.id,
+          film_id: String(film.id),
+          film_title: film.title,
+          film_poster: film.poster,
+          film_year: film.year,
+          film_genres: [],
+          rating: votes[film.id]
+        }))
+
+      if (ratingRows.length > 0) {
+        const { error: ratingsError } = await supabase
+          .from('user_ratings')
+          .upsert(ratingRows, { onConflict: 'user_id,film_id' })
+        console.log('ratings saved:', ratingsError)
+      }
+    }
+
     setDone(true)
     fetchParticipants()
   }
