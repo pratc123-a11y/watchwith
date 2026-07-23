@@ -114,98 +114,107 @@ export default function Home() {
     const selectedGenreNames = GENRES
       .filter(g => selectedGenres.includes(g.id))
       .map(g => g.name)
-    const { error } = await supabase.from('sessions').insert({
+    await supabase.from('sessions').insert({
       id,
       films: [],
       film_list: films,
       mode: mode,
       genres: selectedGenreNames
     })
-    console.log('session insert error:', error)
     router.push(`/session/${id}`)
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-md mx-auto">
-      <h1 className="text-3xl font-medium mt-16 mb-4">
-        Stop arguing about what to watch.
-      </h1>
-      <p className="text-gray-300 mb-10">
-        Everyone rates a few films. We find what works for the whole group.
-      </p>
+    <main className="min-h-screen flex flex-col items-center justify-center p-8">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-10">
+          <h1 className="text-4xl font-medium mb-2">
+            watch<span className="text-purple-400">with</span>
+          </h1>
+          <p className="text-gray-400 text-sm">Stop arguing about what to watch.</p>
+        </div>
 
-      {step === 'mode' && (
-        <>
-          <p className="text-sm font-medium text-white mb-3">What are you looking for tonight?</p>
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => setMode('rated')}
-              className={`flex-1 py-3 rounded-xl border text-sm transition-all ${
-                mode === 'rated'
-                  ? 'bg-purple-700 text-white border-purple-700'
-                  : 'border-gray-600 text-gray-100'
-              }`}
-            >
-              🌟 Something we love
-            </button>
-            <button
-              onClick={() => setMode('unseen')}
-              className={`flex-1 py-3 rounded-xl border text-sm transition-all ${
-                mode === 'unseen'
-                  ? 'bg-purple-700 text-white border-purple-700'
-                  : 'border-gray-600 text-gray-100'
-              }`}
-            >
-              🎲 Surprise us
-            </button>
-          </div>
-          <button
-            onClick={() => setStep('genres')}
-            disabled={!mode}
-            className="w-full bg-purple-700 text-white px-6 py-3 rounded-xl font-medium disabled:opacity-40"
-          >
-            Next — pick genres
-          </button>
-        </>
-      )}
-
-      {step === 'genres' && (
-        <>
-          <div className="flex items-center gap-3 mb-6">
-            <button
-              onClick={() => setStep('mode')}
-              className="text-gray-400 text-sm"
-            >
-              ← Back
-            </button>
-            <p className="text-sm font-medium text-white">
-              What are you in the mood for? (pick up to 2)
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mb-6">
-            {GENRES.map(genre => (
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-4">
+          {step === 'mode' && (
+            <>
+              <h2 className="text-base font-medium text-white mb-1">Start a session</h2>
+              <p className="text-gray-400 text-sm mb-6">What are you looking for tonight?</p>
+              <div className="flex flex-col gap-3 mb-6">
+                <button
+                  onClick={() => setMode('rated')}
+                  className={`w-full py-3 px-4 rounded-xl border text-sm transition-all text-left ${
+                    mode === 'rated'
+                      ? 'bg-purple-700 text-white border-purple-700'
+                      : 'border-gray-700 text-gray-200 hover:border-gray-500'
+                  }`}
+                >
+                  <span className="block font-medium mb-0.5">🌟 Something we love</span>
+                  <span className="block text-xs opacity-70">Rate films you know and find your best group match</span>
+                </button>
+                <button
+                  onClick={() => setMode('unseen')}
+                  className={`w-full py-3 px-4 rounded-xl border text-sm transition-all text-left ${
+                    mode === 'unseen'
+                      ? 'bg-purple-700 text-white border-purple-700'
+                      : 'border-gray-700 text-gray-200 hover:border-gray-500'
+                  }`}
+                >
+                  <span className="block font-medium mb-0.5">🎲 Surprise us</span>
+                  <span className="block text-xs opacity-70">Discover something none of you have seen</span>
+                </button>
+              </div>
               <button
-                key={genre.id}
-                onClick={() => toggleGenre(genre.id)}
-                className={`py-3 px-4 rounded-xl border text-sm transition-all text-left ${
-                  selectedGenres.includes(genre.id)
-                    ? 'bg-purple-700 text-white border-purple-700'
-                    : 'border-gray-600 text-gray-100'
-                }`}
+                onClick={() => setStep('genres')}
+                disabled={!mode}
+                className="w-full bg-purple-700 hover:bg-purple-600 text-white py-3 rounded-xl font-medium disabled:opacity-40 transition-all text-sm"
               >
-                {genre.emoji} {genre.name}
+                Next — pick genres
               </button>
-            ))}
-          </div>
-          <button
-            onClick={createSession}
-            disabled={loading}
-            className="w-full bg-purple-700 text-white px-6 py-3 rounded-xl font-medium disabled:opacity-40"
-          >
-            {loading ? 'Setting up session...' : selectedGenres.length > 0 ? 'Start session' : 'Start session (any genre)'}
-          </button>
-        </>
-      )}
+            </>
+          )}
+
+          {step === 'genres' && (
+            <>
+              <div className="flex items-center gap-3 mb-1">
+                <button onClick={() => setStep('mode')} className="text-gray-400 text-sm hover:text-white">
+                  ←
+                </button>
+                <h2 className="text-base font-medium text-white">Tonight's mood</h2>
+              </div>
+              <p className="text-gray-400 text-sm mb-5 ml-6">Pick up to 2 genres</p>
+              <div className="grid grid-cols-2 gap-2 mb-6">
+                {GENRES.map(genre => (
+                  <button
+                    key={genre.id}
+                    onClick={() => toggleGenre(genre.id)}
+                    className={`py-2.5 px-3 rounded-xl border text-sm transition-all text-left ${
+                      selectedGenres.includes(genre.id)
+                        ? 'bg-purple-700 text-white border-purple-700'
+                        : 'border-gray-700 text-gray-200 hover:border-gray-500'
+                    }`}
+                  >
+                    {genre.emoji} {genre.name}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={createSession}
+                disabled={loading}
+                className="w-full bg-purple-700 hover:bg-purple-600 text-white py-3 rounded-xl font-medium disabled:opacity-40 transition-all text-sm"
+              >
+                {loading ? 'Setting up...' : selectedGenres.length > 0 ? 'Start session' : 'Start session (any genre)'}
+              </button>
+            </>
+          )}
+        </div>
+
+        <a
+          href="/auth"
+          className="block text-center border border-gray-700 text-gray-200 py-3 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all"
+        >
+          Sign in to save your taste profile
+        </a>
+      </div>
     </main>
   )
 }
