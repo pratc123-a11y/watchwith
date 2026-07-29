@@ -113,8 +113,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
   const [resultsReady, setResultsReady] = useState(false)
+  const [userParticipant, setUserParticipant] = useState<any>(null)
+  const [checkingStatus, setCheckingStatus] = useState(true)
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) setCheckingStatus(false)
+    })
     fetchParticipants()
     fetchFilms()
 
@@ -174,7 +179,19 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       .from('participants')
       .select('*')
       .eq('session_id', id)
-    if (data) setParticipants(data)
+    if (data) {
+      setParticipants(data)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const existing = data.find(p => p.name === user.user_metadata?.username)
+        if (existing) {
+          setUserParticipant(existing)
+          setDone(true)
+          setJoined(true)
+        }
+      }
+      setCheckingStatus(false)
+    }
   }
 
   async function fetchPastRatings() {
@@ -193,6 +210,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   async function joinSession() {
     if (!name.trim()) return
+    setCheckingStatus(false)
     setJoined(true)
     await fetchPastRatings()
   }
@@ -238,6 +256,17 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }
 
   const allVoted = films.length > 0 && films.every(f => votes[f.id] !== undefined && votes[f.id] !== null)
+
+  if (checkingStatus) {
+    return (
+      <main className="min-h-screen p-8 max-w-md mx-auto flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 text-sm">Loading session...</p>
+        </div>
+      </main>
+    )
+  }
   if (done) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
