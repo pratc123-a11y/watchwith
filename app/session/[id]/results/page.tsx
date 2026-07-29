@@ -64,7 +64,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     if (!loading) return
     const interval = setInterval(() => {
       setLoadingMessage(prev => (prev + 1) % loadingMessages.length)
-    }, 2500)
+    }, 5500)
     return () => clearInterval(interval)
   }, [loading])
 
