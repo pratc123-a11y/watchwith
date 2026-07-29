@@ -371,6 +371,16 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
   ) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || historySaved) return
+
+    const { data: existing } = await supabase
+      .from('session_history')
+      .select('id')
+      .eq('session_id', id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (existing) return
+
     setHistorySaved(true)
     const names = participantData.map(p => p.name)
     await supabase.from('session_history').insert({
