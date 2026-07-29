@@ -23,9 +23,30 @@ export default function ProfilePage() {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   const AVATARS = [
-    '🎬', '🎭', '🍿', '🎥', '👾', '🦁', '🚀', '👻',
-    '🕵️', '🧙', '🦸', '🤖', '🐉', '🦊', '🎸', '⚡',
-    '🌙', '🔥', '💫', '🎯', '🦋', '🐺', '🌊', '🎪'
+    { emoji: '🎬', name: 'The Director' },
+    { emoji: '🎭', name: 'The Actor' },
+    { emoji: '🍿', name: 'The Cinephile' },
+    { emoji: '🎥', name: 'The Filmmaker' },
+    { emoji: '🧙', name: 'Gandalf' },
+    { emoji: '🦁', name: 'Simba' },
+    { emoji: '🚀', name: 'Buzz Lightyear' },
+    { emoji: '👻', name: 'Casper' },
+    { emoji: '🕵️', name: 'Sherlock' },
+    { emoji: '🦸', name: 'The Hero' },
+    { emoji: '🤖', name: 'HAL 9000' },
+    { emoji: '🐉', name: 'Smaug' },
+    { emoji: '🦊', name: 'Fantastic Mr Fox' },
+    { emoji: '👾', name: 'Space Invader' },
+    { emoji: '🌙', name: 'Luna' },
+    { emoji: '🔥', name: 'Zuko' },
+    { emoji: '💫', name: 'Stardust' },
+    { emoji: '🐺', name: 'Lupin' },
+    { emoji: '🌊', name: 'Aquaman' },
+    { emoji: '🎯', name: 'Hawkeye' },
+    { emoji: '⚡', name: 'Thor' },
+    { emoji: '🦋', name: 'Mothra' },
+    { emoji: '🎪', name: 'The Ringmaster' },
+    { emoji: '🎸', name: 'Dewey Finn' },
   ]
   useEffect(() => {
     loadProfile()
@@ -104,7 +125,11 @@ async function saveAvatar(emoji: string) {
           <div className="relative">
             <button
               onClick={() => setShowAvatarPicker(true)}
-              className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-purple-900 flex items-center justify-center shadow-lg hover:opacity-90 transition-all"
+              className={`w-20 h-20 rounded-full flex items-center justify-center shadow-lg hover:opacity-90 transition-all ${
+                user?.user_metadata?.avatar
+                  ? 'bg-gray-800 border-2 border-gray-700'
+                  : 'bg-gradient-to-br from-purple-600 to-purple-900'
+              }`}
             >
               {user?.user_metadata?.avatar ? (
                 <span className="text-4xl">{user.user_metadata.avatar}</span>
@@ -259,18 +284,19 @@ async function saveAvatar(emoji: string) {
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-6 gap-3">
-              {AVATARS.map(emoji => (
+            <div className="grid grid-cols-4 gap-2">
+              {AVATARS.map(({ emoji, name }) => (
                 <button
                   key={emoji}
                   onClick={() => saveAvatar(emoji)}
-                  className={`text-3xl p-2 rounded-xl transition-all hover:bg-gray-800 ${
+                  className={`flex flex-col items-center p-2 rounded-xl transition-all hover:bg-gray-800 ${
                     user?.user_metadata?.avatar === emoji
                       ? 'bg-purple-900 border border-purple-600'
                       : ''
                   }`}
                 >
-                  {emoji}
+                  <span className="text-3xl mb-1">{emoji}</span>
+                  <span className="text-xs text-gray-400 text-center leading-tight">{name}</span>
                 </button>
               ))}
             </div>
