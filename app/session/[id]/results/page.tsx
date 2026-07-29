@@ -459,32 +459,6 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
             </span>
           </div>
           {expandedFilm === result.film.id && (
-            <div className="px-4 pb-4 border-t border-gray-700 pt-3">
-              {result.film.synopsis && (
-                <p className="text-xs text-gray-300 leading-relaxed mb-3">{result.film.synopsis}</p>
-              )}
-              <div className="flex flex-col gap-1">
-                {result.film.cast.length > 0 && (
-                  <p className="text-xs text-gray-400">
-                    <span className="text-gray-200 font-medium">Cast: </span>
-                    {result.film.cast.join(', ')}
-                  </p>
-                )}
-                {result.film.runtime > 0 && (
-                  <p className="text-xs text-gray-400">
-                    <span className="text-gray-200 font-medium">Runtime: </span>
-                    {Math.floor(result.film.runtime / 60)}h {result.film.runtime % 60}m
-                  </p>
-                )}
-                {result.film.language && (
-                  <p className="text-xs text-gray-400">
-                    <span className="text-gray-200 font-medium">Language: </span>
-                    {result.film.language}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}{expandedFilm === result.film.id && (
             <div className="px-4 pb-4 border-t border-gray-700 pt-4">
               {result.film.synopsis && (
                 <p className="text-sm text-gray-100 leading-relaxed mb-4">{result.film.synopsis}</p>
