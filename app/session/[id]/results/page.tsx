@@ -17,6 +17,10 @@ type Film = {
   director: string
   tmdbRating: number
   streaming: {name: string, logo: string, link: string}[]
+  synopsis: string
+  cast: string[]
+  runtime: number
+  language: string
 }
 
 type Participant = {
@@ -43,6 +47,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
   const [groupSummary, setGroupSummary] = useState<string>('')
+  const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
 
   useEffect(() => {
     fetchAndScore()
@@ -165,6 +170,7 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
         const data = await res.json()
         const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
         const streaming = await fetchStreaming(data.id)
+        const cast = data.credits?.cast?.slice(0, 3).map((c: any) => c.name) || []
         return {
           id: data.id,
           title: data.title,
@@ -173,7 +179,11 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
           genres: data.genres?.map((g: any) => g.name) || [],
           director,
           tmdbRating: Math.round(data.vote_average * 10) / 10,
-          streaming
+          streaming,
+          synopsis: data.overview || '',
+          cast,
+          runtime: data.runtime || 0,
+          language: data.original_language?.toUpperCase() || ''
         } as Film
       })
     )
@@ -235,6 +245,7 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
         const data = await res.json()
        const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
         const streaming = await fetchStreaming(data.id)
+        const cast = data.credits?.cast?.slice(0, 3).map((c: any) => c.name) || []
         return {
           id: data.id,
           title: data.title,
@@ -243,7 +254,11 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
           genres: data.genres?.map((g: any) => g.name) || [],
           director,
           tmdbRating: Math.round(data.vote_average * 10) / 10,
-          streaming
+          streaming,
+          synopsis: data.overview || '',
+          cast,
+          runtime: data.runtime || 0,
+          language: data.original_language?.toUpperCase() || ''
         } as Film
       })
     )
@@ -375,7 +390,10 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
           key={result.film.id}
           className={`mb-6 rounded-2xl overflow-hidden border ${i === 0 ? 'border-purple-400' : 'border-gray-600'}`}
         >
-          <div className="flex gap-3 p-4 items-start overflow-hidden">
+          <div
+            className="flex gap-3 p-4 items-start overflow-hidden cursor-pointer"
+            onClick={() => setExpandedFilm(expandedFilm === result.film.id ? null : result.film.id)}
+          >
             {result.film.poster && (
               <img
                 src={`https://image.tmdb.org/t/p/w200${result.film.poster}`}
@@ -434,7 +452,39 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
                 <p className="text-xs text-gray-400">Not streaming in AU</p>
               )}
             </div>
+         </div>
+          <div className="px-4 pb-1 flex justify-center">
+            <span className="text-xs text-gray-500">
+              {expandedFilm === result.film.id ? '▲ less' : '▼ more'}
+            </span>
           </div>
+          {expandedFilm === result.film.id && (
+            <div className="px-4 pb-4 border-t border-gray-700 pt-3">
+              {result.film.synopsis && (
+                <p className="text-xs text-gray-300 leading-relaxed mb-3">{result.film.synopsis}</p>
+              )}
+              <div className="flex flex-col gap-1">
+                {result.film.cast.length > 0 && (
+                  <p className="text-xs text-gray-400">
+                    <span className="text-gray-200 font-medium">Cast: </span>
+                    {result.film.cast.join(', ')}
+                  </p>
+                )}
+                {result.film.runtime > 0 && (
+                  <p className="text-xs text-gray-400">
+                    <span className="text-gray-200 font-medium">Runtime: </span>
+                    {Math.floor(result.film.runtime / 60)}h {result.film.runtime % 60}m
+                  </p>
+                )}
+                {result.film.language && (
+                  <p className="text-xs text-gray-400">
+                    <span className="text-gray-200 font-medium">Language: </span>
+                    {result.film.language}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </main>
