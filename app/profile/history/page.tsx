@@ -77,7 +77,7 @@ export default function HistoryPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {history.map(session => (
-            <div key={session.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+           <a key={session.id} href={`/session/${session.session_id}/results`} className="bg-gray-900 border border-gray-800 rounded-2xl p-4 block hover:border-gray-600 transition-all">
               <div className="flex gap-3 items-start">
                 {session.top_film_poster ? (
                   <img
@@ -115,7 +115,7 @@ export default function HistoryPage() {
                   )}
                 </div>
               </div>
-            </div>
+            </a>
           ))}
         </div>
       )}
