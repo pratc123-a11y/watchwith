@@ -47,9 +47,10 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
   const [groupSummary, setGroupSummary] = useState<string>('')
- const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
+  const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
   const [watchedFilms, setWatchedFilms] = useState<Set<number>>(new Set())
   const [loadingMessage, setLoadingMessage] = useState(0)
+  const [historySaved, setHistorySaved] = useState(false)
   const loadingMessages = [
     "Calculating... slower than a hobbit leaving the Shire 🧙",
     "Almost there... the sorting hat is still thinking 🎩",
@@ -254,9 +255,10 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
     if (mode === 'unseen') {
       const surpriseResults = await fetchSurpriseFilms(participantData)
       setResults(surpriseResults)
-      const summary = await generateGroupSummary(participantData, surpriseResults, 'unseen', sessionGenres)
-      setGroupSummary(summary)
-      setLoading(false)
+    const summary = await generateGroupSummary(participantData, surpriseResults, 'unseen', sessionGenres)
+    setGroupSummary(summary)
+    if (surpriseResults.length > 0) saveSessionHistory(participantData, surpriseResults[0], 'unseen', genres)
+    setLoading(false)
       return
     }
     const allFilmIds = new Set<string>()
@@ -341,7 +343,29 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
     setResults(top5)
     const summary = await generateGroupSummary(participantData, top5, mode, sessionGenres)
     setGroupSummary(summary)
+    if (top5.length > 0) saveSessionHistory(participantData, top5[0], mode, genres)
     setLoading(false)
+  }
+  async function saveSessionHistory(
+    participantData: any[],
+    topFilm: FilmResult,
+    mode: string,
+    genres: string[]
+  ) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user || historySaved) return
+    setHistorySaved(true)
+    const names = participantData.map(p => p.name)
+    await supabase.from('session_history').insert({
+      session_id: id,
+      user_id: user.id,
+      participant_names: names,
+      top_film_title: topFilm.film.title,
+      top_film_poster: topFilm.film.poster,
+      top_film_year: topFilm.film.year,
+      genres,
+      mode
+    })
   }
 async function markWatched(film: Film) {
     const newWatched = new Set(watchedFilms)
