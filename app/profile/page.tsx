@@ -60,7 +60,7 @@ export default function ProfilePage() {
   }
 
   const stats = getStats()
-  const topFilms = ratings.filter(r => r.rating >= 4).slice(0, 6)
+  const topFilms = ratings.filter(r => r.rating >= 4.5).slice(0, 6)
   const watchLaterFilms = ratings.filter(r => r.rating === -1).slice(0, 6)
   if (loading) {
     return (
@@ -86,30 +86,36 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {stats && (
+     {stats && (
         <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+          <a href="/profile/rated" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-600 transition-all">
             <p className="text-3xl font-medium text-white">{stats.total}</p>
             <p className="text-gray-400 text-sm mt-1">Films rated</p>
-          </div>
+            <p className="text-purple-400 text-xs mt-1">View all →</p>
+          </a>
           <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
             <p className="text-3xl font-medium text-white">{stats.avg}★</p>
             <p className="text-gray-400 text-sm mt-1">Average rating</p>
           </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+          <a href="/profile/loved" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-600 transition-all">
             <p className="text-3xl font-medium text-white">{stats.loved}</p>
-            <p className="text-gray-400 text-sm mt-1">Films loved (4★+)</p>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+            <p className="text-gray-400 text-sm mt-1">Films loved (4.5★+)</p>
+            <p className="text-purple-400 text-xs mt-1">View all →</p>
+          </a>
+          <a href="/profile/watchlater" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-gray-600 transition-all">
             <p className="text-3xl font-medium text-white">{stats.watchLater}</p>
             <p className="text-gray-400 text-sm mt-1">Watch later</p>
-          </div>
+            <p className="text-purple-400 text-xs mt-1">View all →</p>
+          </a>
         </div>
       )}
 
       {topFilms.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-white font-medium mb-3">Films you loved</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-white font-medium">Films you loved</h2>
+            <a href="/profile/loved" className="text-purple-400 text-xs">View all →</a>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {topFilms.map(film => (
               <div key={film.film_id}>
@@ -134,7 +140,10 @@ export default function ProfilePage() {
 
       {watchLaterFilms.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-white font-medium mb-3">🕐 Watch later</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-white font-medium">🕐 Watch later</h2>
+            <a href="/profile/watchlater" className="text-purple-400 text-xs">View all →</a>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {watchLaterFilms.map(film => (
               <div key={film.film_id}>
