@@ -58,7 +58,7 @@ export default function Navbar() {
               onClick={() => setMenuOpen(!menuOpen)}
               className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-sm font-medium hover:bg-purple-600 transition-all"
             >
-              {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+             {user?.user_metadata?.avatar || user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-10 bg-gray-900 border border-gray-700 rounded-xl overflow-hidden w-44 shadow-xl">

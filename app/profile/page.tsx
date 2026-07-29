@@ -17,14 +17,31 @@ type Rating = {
 }
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<any>(null)
+ const [user, setUser] = useState<any>(null)
   const [ratings, setRatings] = useState<Rating[]>([])
   const [loading, setLoading] = useState(true)
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
+  const AVATARS = [
+    '🎬', '🎭', '🍿', '🎥', '👾', '🦁', '🚀', '👻',
+    '🕵️', '🧙', '🦸', '🤖', '🐉', '🦊', '🎸', '⚡',
+    '🌙', '🔥', '💫', '🎯', '🦋', '🐺', '🌊', '🎪'
+  ]
   useEffect(() => {
     loadProfile()
   }, [])
-
+async function saveAvatar(emoji: string) {
+    const { error } = await supabase.auth.updateUser({
+      data: { avatar: emoji }
+    })
+    if (!error) {
+      setUser((prev: any) => ({
+        ...prev,
+        user_metadata: { ...prev.user_metadata, avatar: emoji }
+      }))
+    }
+    setShowAvatarPicker(false)
+  }
   async function loadProfile() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -85,10 +102,24 @@ export default function ProfilePage() {
       <div className="relative px-6 pt-8 pb-6 mb-6 border-b border-gray-800">
         <div className="flex items-center gap-5">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-purple-900 flex items-center justify-center text-white text-3xl font-medium shadow-lg">
-              {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-black" />
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-purple-900 flex items-center justify-center shadow-lg hover:opacity-90 transition-all"
+            >
+              {user?.user_metadata?.avatar ? (
+                <span className="text-4xl">{user.user_metadata.avatar}</span>
+              ) : (
+                <span className="text-white text-3xl font-medium">
+                  {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              className="absolute -bottom-1 -right-1 w-6 h-6 bg-purple-600 rounded-full border-2 border-black flex items-center justify-center hover:bg-purple-500 transition-all"
+            >
+              <span className="text-white text-xs">✎</span>
+            </button>
           </div>
           <div className="flex-1">
             <h1 className="text-xl font-medium text-white mb-0.5">
@@ -210,6 +241,48 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+      {showAvatarPicker && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-end justify-center"
+          onClick={() => setShowAvatarPicker(false)}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-t-3xl p-6 w-full max-w-md"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-white font-medium">Choose your avatar</h3>
+              <button
+                onClick={() => setShowAvatarPicker(false)}
+                className="text-gray-400 hover:text-white text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-6 gap-3">
+              {AVATARS.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => saveAvatar(emoji)}
+                  className={`text-3xl p-2 rounded-xl transition-all hover:bg-gray-800 ${
+                    user?.user_metadata?.avatar === emoji
+                      ? 'bg-purple-900 border border-purple-600'
+                      : ''
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => saveAvatar('')}
+              className="w-full mt-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-xl hover:bg-gray-800 transition-all"
+            >
+              Reset to default
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
