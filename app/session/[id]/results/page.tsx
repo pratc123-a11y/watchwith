@@ -442,6 +442,9 @@ async function markWatched(film: Film) {
           <div className="h-4 w-64 bg-gray-800 rounded-lg mb-2 animate-pulse" />
           <div className="h-3 w-32 bg-gray-800 rounded-lg animate-pulse" />
         </div>
+        <p className="text-center text-sm text-gray-400 mb-8 leading-relaxed px-4 transition-all duration-500 min-h-[40px]">
+          {loadingMessages[loadingMessage]}
+        </p>
         {[1,2,3].map(i => (
           <div key={i} className="mb-4 rounded-2xl border border-gray-800 p-4">
             <div className="flex gap-3 items-start">
@@ -465,9 +468,6 @@ async function markWatched(film: Film) {
             </div>
           </div>
         ))}
-        <p className="text-center text-sm text-gray-400 mt-6 leading-relaxed px-4 transition-all duration-500">
-          {loadingMessages[loadingMessage]}
-        </p>
       </main>
     )
   }
@@ -547,10 +547,18 @@ async function markWatched(film: Film) {
                   ))}
                 </div>
               )}
-              {sessionMode === 'rated' && (
-                <div className="flex items-center gap-1 mb-2">
-                  <div className="flex">{renderStars(result.groupScore)}</div>
-                  <span className="text-xs text-gray-300">{result.groupScore}★</span>
+             {sessionMode === 'rated' && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {result.breakdown.filter(b => b.vote > 0).map(b => (
+                    <span key={b.name} className="text-xs bg-gray-700 text-gray-200 px-2 py-0.5 rounded-full">
+                      {b.name} {b.vote}★
+                    </span>
+                  ))}
+                  {result.breakdown.filter(b => b.vote === -1).map(b => (
+                    <span key={b.name} className="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full">
+                      🕐 {b.name} — unseen
+                    </span>
+                  ))}
                 </div>
               )}
               {result.film.streaming && result.film.streaming.length > 0 ? (
@@ -622,7 +630,14 @@ async function markWatched(film: Film) {
                   {result.film.language && (
                     <div>
                       <p className="text-xs text-purple-400 font-medium uppercase tracking-wide mb-1">Language</p>
-                      <p className="text-sm text-white">{result.film.language}</p>
+                      <p className="text-sm text-white">{{
+                        'EN': 'English', 'FR': 'French', 'DE': 'German',
+                        'ES': 'Spanish', 'IT': 'Italian', 'JA': 'Japanese',
+                        'KO': 'Korean', 'ZH': 'Mandarin', 'PT': 'Portuguese',
+                        'RU': 'Russian', 'AR': 'Arabic', 'HI': 'Hindi',
+                        'SV': 'Swedish', 'DA': 'Danish', 'NL': 'Dutch',
+                        'PL': 'Polish', 'TR': 'Turkish', 'TH': 'Thai'
+                      }[result.film.language] || result.film.language}</p>
                     </div>
                   )}
                 </div>
