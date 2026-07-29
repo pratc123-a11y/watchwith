@@ -547,20 +547,6 @@ async function markWatched(film: Film) {
                   ))}
                 </div>
               )}
-             {sessionMode === 'rated' && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {result.breakdown.filter(b => b.vote > 0).map(b => (
-                    <span key={b.name} className="text-xs bg-gray-700 text-gray-200 px-2 py-0.5 rounded-full">
-                      {b.name} {b.vote}★
-                    </span>
-                  ))}
-                  {result.breakdown.filter(b => b.vote === -1).map(b => (
-                    <span key={b.name} className="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full">
-                      🕐 {b.name} — unseen
-                    </span>
-                  ))}
-                </div>
-              )}
               {result.film.streaming && result.film.streaming.length > 0 ? (
                 <div className="flex flex-wrap gap-1 items-center">
                   {result.film.streaming.map(service => (

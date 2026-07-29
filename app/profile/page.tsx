@@ -150,7 +150,7 @@ async function saveAvatar(emoji: string) {
             <h1 className="text-xl font-medium text-white mb-0.5">
               {user?.user_metadata?.username || 'Anonymous'}
             </h1>
-            <p className="text-gray-500 text-sm">{user?.email}</p>
+            <p className="text-gray-300 text-sm">{user?.email}</p>
             {stats && (
               <p className="text-gray-400 text-xs mt-1">
                 {stats.total} films rated · {stats.avg}★ avg
@@ -165,22 +165,22 @@ async function saveAvatar(emoji: string) {
           <div className="grid grid-cols-2 gap-3 mb-8">
             <a href="/profile/rated" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-purple-800 transition-all group">
               <p className="text-2xl font-medium text-white mb-1">{stats.total}</p>
-              <p className="text-gray-500 text-xs">Films rated</p>
+              <p className="text-gray-300 text-xs">Films rated</p>
               <p className="text-purple-400 text-xs mt-2 opacity-0 group-hover:opacity-100 transition-all">View →</p>
             </a>
             <a href="/profile/loved" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-purple-800 transition-all group">
               <p className="text-2xl font-medium text-white mb-1">{stats.loved}</p>
-              <p className="text-gray-500 text-xs">Films loved</p>
+              <p className="text-gray-300 text-xs">Films loved</p>
               <p className="text-purple-400 text-xs mt-2 opacity-0 group-hover:opacity-100 transition-all">View →</p>
             </a>
             <a href="/profile/watchlater" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-purple-800 transition-all group">
               <p className="text-2xl font-medium text-white mb-1">{stats.watchLater}</p>
-              <p className="text-gray-500 text-xs">Watch later</p>
+              <p className="text-gray-300 text-xs">Watch later</p>
               <p className="text-purple-400 text-xs mt-2 opacity-0 group-hover:opacity-100 transition-all">View →</p>
             </a>
             <a href="/profile/history" className="bg-gray-900 border border-gray-800 rounded-2xl p-4 hover:border-purple-800 transition-all group">
               <p className="text-2xl font-medium text-white mb-1">🎬</p>
-              <p className="text-gray-500 text-xs">Session history</p>
+              <p className="text-gray-300 text-xs">Session history</p>
               <p className="text-purple-400 text-xs mt-2 opacity-0 group-hover:opacity-100 transition-all">View →</p>
             </a>
           </div>
