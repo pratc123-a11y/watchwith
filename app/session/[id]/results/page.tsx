@@ -47,7 +47,8 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
   const [groupSummary, setGroupSummary] = useState<string>('')
-  const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
+ const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
+  const [watchedFilms, setWatchedFilms] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchAndScore()
@@ -316,7 +317,36 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
     setGroupSummary(summary)
     setLoading(false)
   }
+async function markWatched(film: Film) {
+    const newWatched = new Set(watchedFilms)
+    if (newWatched.has(film.id)) {
+      newWatched.delete(film.id)
+    } else {
+      newWatched.add(film.id)
+    }
+    setWatchedFilms(newWatched)
 
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    if (newWatched.has(film.id)) {
+      await supabase.from('user_ratings').upsert({
+        user_id: user.id,
+        film_id: String(film.id),
+        film_title: film.title,
+        film_poster: film.poster,
+        film_year: film.year,
+        film_genres: film.genres,
+        rating: -3
+      }, { onConflict: 'user_id,film_id' })
+    } else {
+      await supabase.from('user_ratings')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('film_id', String(film.id))
+        .eq('rating', -3)
+    }
+  }
   function renderStars(score: number) {
     return [1,2,3,4,5].map(star => {
       const full = star <= score
@@ -340,10 +370,36 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
   if (loading) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
-        <p className="text-gray-400 mt-16">
-          {sessionMode === 'unseen'
-            ? 'Finding something new for your group...'
-            : 'Calculating best matches...'}
+        <div className="mt-8 mb-6">
+          <div className="h-7 w-48 bg-gray-800 rounded-lg mb-3 animate-pulse" />
+          <div className="h-4 w-64 bg-gray-800 rounded-lg mb-2 animate-pulse" />
+          <div className="h-3 w-32 bg-gray-800 rounded-lg animate-pulse" />
+        </div>
+        {[1,2,3].map(i => (
+          <div key={i} className="mb-4 rounded-2xl border border-gray-800 p-4">
+            <div className="flex gap-3 items-start">
+              <div
+                className="rounded-lg bg-gray-800 animate-pulse flex-shrink-0"
+                style={{width: '64px', height: '96px'}}
+              />
+              <div className="flex-1">
+                <div className="h-3 w-16 bg-gray-700 rounded-full mb-3 animate-pulse" />
+                <div className="h-4 w-40 bg-gray-800 rounded-lg mb-2 animate-pulse" />
+                <div className="h-3 w-28 bg-gray-800 rounded-lg mb-3 animate-pulse" />
+                <div className="flex gap-1 mb-2">
+                  <div className="h-5 w-12 bg-gray-800 rounded-full animate-pulse" />
+                  <div className="h-5 w-14 bg-gray-800 rounded-full animate-pulse" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-6 w-16 bg-gray-800 rounded-lg animate-pulse" />
+                  <div className="h-6 w-14 bg-gray-800 rounded-lg animate-pulse" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+        <p className="text-center text-xs text-gray-600 mt-4 animate-pulse">
+          {sessionMode === 'unseen' ? 'Finding something new...' : 'Calculating best matches...'}
         </p>
       </main>
     )
@@ -463,6 +519,16 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
               {result.film.synopsis && (
                 <p className="text-sm text-gray-100 leading-relaxed mb-4">{result.film.synopsis}</p>
               )}
+              <button
+                onClick={e => { e.stopPropagation(); markWatched(result.film) }}
+                className={`w-full py-2 rounded-xl text-sm font-medium mb-3 transition-all ${
+                  watchedFilms.has(result.film.id)
+                    ? 'bg-green-900 text-green-300 border border-green-700'
+                    : 'border border-gray-600 text-gray-300 hover:border-gray-400'
+                }`}
+              >
+                {watchedFilms.has(result.film.id) ? '✓ Marked as watched' : 'Mark as watched'}
+              </button>
               <div className="flex flex-col gap-3">
                 {result.film.cast.length > 0 && (
                   <div>
