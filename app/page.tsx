@@ -95,11 +95,21 @@ export default function Home() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
-      if (data.user) fetchWatchedFilms(data.user.id)
+      if (data.user) {
+        fetchWatchedFilms(data.user.id)
+        if (!data.user.user_metadata?.username) {
+          window.location.href = '/onboarding'
+        }
+      }
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) fetchWatchedFilms(session.user.id)
+      if (session?.user) {
+        fetchWatchedFilms(session.user.id)
+        if (!session.user.user_metadata?.username) {
+          window.location.href = '/onboarding'
+        }
+      }
     })
     return () => listener.subscription.unsubscribe()
   }, [])
