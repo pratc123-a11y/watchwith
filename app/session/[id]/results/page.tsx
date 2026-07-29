@@ -33,7 +33,6 @@ type FilmResult = {
   breakdown: { name: string, vote: number }[]
   lowestScore: number
   watchLaterCount: number
-  explanation: string
 }
 
 export default function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +42,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(true)
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
+  const [groupSummary, setGroupSummary] = useState<string>('')
 
   useEffect(() => {
     fetchAndScore()
@@ -71,21 +71,22 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  async function generateExplanation(film: Film, breakdown: { name: string, vote: number }[], score: number): Promise<string> {
-    const ratedPeople = breakdown.filter(b => b.vote > 0)
-    const topFans = ratedPeople.filter(b => b.vote >= 4).map(b => b.name)
-    const genres = film.genres.join(', ')
-    const lowestVote = ratedPeople.length > 0 ? Math.min(...ratedPeople.map(b => b.vote)) : 0
-    const prompt = sessionMode === 'unseen'
-      ? `A group wants to discover a new film. "${film.title}" (${film.year}).
-Genres: ${genres}.
-Write ONE sentence (max 20 words) explaining why this would be a great new discovery for the group based on its genres. Don't start with "This".`
-      : `A group is picking a movie together. "${film.title}" (${film.year}).
-Genres: ${genres}.
-Individual scores: ${ratedPeople.map(b => `${b.name} gave it ${b.vote}/5`).join(', ')}.
-Lowest score in group: ${lowestVote}/5.
-${topFans.length > 0 ? `${topFans.join(' and ')} loved it most.` : ''}
-Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP. Focus on what the group has in common. Don't start with "This".`
+  async function generateGroupSummary(
+    participantData: any[],
+    topFilms: FilmResult[],
+    mode: string,
+    genres: string[]
+  ): Promise<string> {
+    const names = participantData.map(p => p.name).join(', ')
+    const topTitles = topFilms.slice(0, 3).map(r => r.film.title).join(', ')
+    const topGenres = [...new Set(topFilms.flatMap(r => r.film.genres.slice(0, 2)))].slice(0, 4).join(', ')
+
+    const prompt = mode === 'unseen'
+      ? `A group of friends (${names}) want to discover new films tonight. They picked genres: ${genres.join(', ')}.
+Top recommendations: ${topTitles}.
+Write ONE sentence (max 25 words) explaining what this group has in common and why these films suit them. Be warm and specific. Don't start with "Based on".`
+      : `A group of friends (${names}) rated films together. Top matches: ${topTitles}. Common genres: ${topGenres}.
+Write ONE sentence (max 25 words) summarising what this group has in common taste-wise and why these picks work for everyone. Be warm and specific. Don't start with "Based on".`
 
     try {
       const res = await fetch('/api/explain', {
@@ -184,17 +185,9 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
       breakdown: [],
       lowestScore: 0,
       watchLaterCount: 0,
-      explanation: ''
     }))
 
-    const withExplanations = await Promise.all(
-      surpriseResults.map(async result => ({
-        ...result,
-        explanation: await generateExplanation(result.film, [], 0)
-      }))
-    )
-
-    return withExplanations
+    return surpriseResults
   }
 
   async function fetchAndScore() {
@@ -224,6 +217,8 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
     if (mode === 'unseen') {
       const surpriseResults = await fetchSurpriseFilms(participantData)
       setResults(surpriseResults)
+      const summary = await generateGroupSummary(participantData, surpriseResults, 'unseen', sessionGenres)
+      setGroupSummary(summary)
       setLoading(false)
       return
     }
@@ -294,7 +289,6 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
         breakdown,
         lowestScore,
         watchLaterCount,
-        explanation: ''
       })
     }
 
@@ -302,14 +296,9 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
 
     const top5 = scored.slice(0, 5)
 
-    const withExplanations = await Promise.all(
-      top5.map(async result => ({
-        ...result,
-        explanation: await generateExplanation(result.film, result.breakdown, result.score)
-      }))
-    )
-
-    setResults(withExplanations)
+    setResults(top5)
+    const summary = await generateGroupSummary(participantData, top5, mode, sessionGenres)
+    setGroupSummary(summary)
     setLoading(false)
   }
 
@@ -368,13 +357,8 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
           Picked based on your group's favourite genres — none of you have rated these before.
         </p>
       )}
-      {sessionMode === 'rated' && (
-        <p className="text-xs text-gray-200 mb-4">
-          Ranked so nobody gets a film they'll hate.
-        </p>
-      )}
       {sessionGenres.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-8">
+        <div className="flex flex-wrap gap-1 mb-3">
           {sessionGenres.map(genre => (
             <span key={genre} className="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full">
               {genre}
@@ -382,38 +366,54 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
           ))}
         </div>
       )}
+      {groupSummary && (
+        <p className="text-sm text-gray-200 italic mb-8 leading-relaxed">{groupSummary}</p>
+      )}
 
       {results.map((result, i) => (
         <div
           key={result.film.id}
           className={`mb-6 rounded-2xl overflow-hidden border ${i === 0 ? 'border-purple-400' : 'border-gray-600'}`}
         >
-          <div className="flex gap-3 p-4">
+          <div className="flex gap-3 p-4 items-start overflow-hidden">
             {result.film.poster && (
               <img
                 src={`https://image.tmdb.org/t/p/w200${result.film.poster}`}
                 alt={result.film.title}
-                className="w-16 rounded-lg flex-shrink-0"
+               className="rounded-lg flex-shrink-0"
+                style={{width: '64px', height: '96px', objectFit: 'cover', objectPosition: 'center'}}
               />
             )}
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               {i === 0 && (
                 <span className="text-xs bg-purple-700 text-purple-100 px-2 py-0.5 rounded-full mb-2 inline-block">
                   {sessionMode === 'unseen' ? 'Top pick' : 'Best match'}
                 </span>
               )}
-              <h2 className="font-medium text-base leading-tight mb-1 text-white">{result.film.title}</h2>
-              <p className="text-xs text-gray-300 mb-1">{result.film.year}{result.film.director ? ` · Dir. ${result.film.director}` : ''}</p>
+              <h2 className="font-medium text-sm leading-tight mb-1 text-white truncate">{result.film.title}</h2>
+              <p className="text-xs text-gray-300 mb-1 truncate">{result.film.year}{result.film.director ? ` · ${result.film.director}` : ''}</p>
               {result.film.tmdbRating > 0 && (
                 <div className="flex items-center gap-1 mb-2">
                   <span className="text-yellow-400 text-xs">★</span>
-                  <span className="text-xs text-gray-300">{result.film.tmdbRating}/10 TMDB</span>
+                  <span className="text-xs text-gray-300">{result.film.tmdbRating}/10</span>
+                </div>
+              )}
+              {result.film.genres.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {result.film.genres.slice(0, 2).map(g => (
+                    <span key={g} className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full">{g}</span>
+                  ))}
+                </div>
+              )}
+              {sessionMode === 'rated' && (
+                <div className="flex items-center gap-1 mb-2">
+                  <div className="flex">{renderStars(result.groupScore)}</div>
+                  <span className="text-xs text-gray-300">{result.groupScore}★</span>
                 </div>
               )}
               {result.film.streaming && result.film.streaming.length > 0 ? (
-                <div className="flex flex-wrap gap-2 mb-2 items-center">
+                <div className="flex flex-wrap gap-1 items-center">
                   {result.film.streaming.map(service => (
-                    
                     <a
                       key={service.name}
                       href={service.link}
@@ -423,11 +423,7 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
                       title={service.name}
                     >
                       {service.logo ? (
-                        <img
-                          src={service.logo}
-                          alt={service.name}
-                          className="h-3 object-contain"
-                        />
+                        <img src={service.logo} alt={service.name} className="h-3 object-contain" />
                       ) : (
                         <span className="text-xs text-white">{service.name}</span>
                       )}
@@ -435,37 +431,7 @@ Write ONE sentence (max 20 words) explaining why this works for the WHOLE GROUP.
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-300 mb-2">Not currently streaming in AU</p>
-              )}
-              {result.film.genres.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {result.film.genres.slice(0, 3).map(g => (
-                    <span key={g} className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">{g}</span>
-                  ))}
-                </div>
-              )}
-              {sessionMode === 'rated' && (
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex">{renderStars(result.groupScore)}</div>
-                  <span className="text-sm text-gray-300">{result.groupScore} group score</span>
-                </div>
-              )}
-              {result.explanation && (
-                <p className="text-xs text-white italic mb-3 leading-relaxed">{result.explanation}</p>
-              )}
-              {sessionMode === 'rated' && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {result.breakdown.filter(b => b.vote > 0).map(b => (
-                    <span key={b.name} className="text-xs bg-gray-700 text-gray-200 px-2 py-0.5 rounded-full">
-                      {b.name} {b.vote}★
-                    </span>
-                  ))}
-                  {result.watchLaterCount > 0 && (
-                    <span className="text-xs bg-blue-900 text-blue-200 px-2 py-0.5 rounded-full">
-                      🕐 {result.watchLaterCount} watch later
-                    </span>
-                  )}
-                </div>
+                <p className="text-xs text-gray-400">Not streaming in AU</p>
               )}
             </div>
           </div>

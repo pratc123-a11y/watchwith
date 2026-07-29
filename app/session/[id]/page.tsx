@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
@@ -17,6 +17,89 @@ type Film = {
 
 type Vote = number | null
 
+function getStarValue(el: HTMLElement, clientX: number) {
+  const rect = el.getBoundingClientRect()
+  const x = Math.max(0, Math.min(clientX - rect.left, rect.width))
+  const starWidth = rect.width / 5
+  const starIndex = Math.floor(x / starWidth)
+  const withinStar = (x % starWidth) / starWidth
+  const clamped = Math.max(0, Math.min(4, starIndex))
+  return withinStar < 0.5 ? clamped + 0.5 : clamped + 1
+}
+
+function StarRating({ filmId, value, onVote }: {
+  filmId: number
+  value: Vote
+  onVote: (filmId: number, star: number) => void
+}) {
+  const [hoverVal, setHoverVal] = useState<number | null>(null)
+  const rowRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = rowRef.current
+    if (!el) return
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault()
+      setHoverVal(getStarValue(el, e.touches[0].clientX))
+    }
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault()
+      onVote(filmId, getStarValue(el, e.changedTouches[0].clientX))
+      setHoverVal(null)
+    }
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    el.addEventListener('touchend', handleTouchEnd, { passive: false })
+    return () => {
+      el.removeEventListener('touchmove', handleTouchMove)
+      el.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [filmId, onVote])
+
+  const currentVal = hoverVal ?? (value ?? 0)
+  const isNegative = currentVal === -1 || currentVal === -2
+
+  return (
+    <div
+      ref={rowRef}
+      className="flex justify-center py-1 select-none cursor-pointer"
+      style={{ touchAction: 'none', width: '100%' }}
+      onMouseMove={e => {
+        if (!rowRef.current) return
+        setHoverVal(getStarValue(rowRef.current, e.clientX))
+      }}
+      onMouseLeave={() => setHoverVal(null)}
+      onClick={e => {
+        if (!rowRef.current) return
+        onVote(filmId, getStarValue(rowRef.current, e.clientX))
+      }}
+    >
+      {[1, 2, 3, 4, 5].map(star => {
+        const fullActive = !isNegative && star <= currentVal
+        const halfActive = !isNegative && star - 0.5 === currentVal
+        return (
+          <div
+            key={star}
+            className="relative pointer-events-none"
+            style={{ width: '20%', height: '28px', display: 'inline-block' }}
+          >
+            <span className="absolute inset-0 flex items-center justify-center text-2xl text-gray-300">
+              ★
+            </span>
+            {(fullActive || halfActive) && (
+              <span
+                className="absolute inset-0 flex items-center justify-center text-2xl text-yellow-400 overflow-hidden"
+                style={{ clipPath: halfActive ? 'inset(0 50% 0 0)' : 'none' }}
+              >
+                ★
+              </span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params)
   const [name, setName] = useState('')
@@ -26,19 +109,27 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [participants, setParticipants] = useState<any[]>([])
   const [copied, setCopied] = useState(false)
   const [films, setFilms] = useState<Film[]>([])
-  const [hoveredStar, setHoveredStar] = useState<{filmId: number, star: number} | null>(null)
   const [mode, setMode] = useState<'rated' | 'unseen' | null>(null)
   const [sessionMode, setSessionMode] = useState<string | null>(null)
+  const [sessionGenres, setSessionGenres] = useState<string[]>([])
 
   useEffect(() => {
     fetchParticipants()
     fetchFilms()
   }, [])
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.user_metadata?.username) {
+        setName(user.user_metadata.username)
+      }
+    })
+  }, [])
+
   async function fetchFilms() {
     const { data } = await supabase
       .from('sessions')
-      .select('film_list, mode')
+      .select('film_list, mode, genres')
       .eq('id', id)
       .single()
     if (data?.film_list) setFilms(data.film_list)
@@ -46,6 +137,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       setSessionMode(data.mode)
       setMode(data.mode)
     }
+    if (data?.genres) setSessionGenres(data.genres)
   }
 
   async function fetchParticipants() {
@@ -59,17 +151,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   async function fetchPastRatings() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const { data: ratings } = await supabase
       .from('user_ratings')
       .select('film_id, rating')
       .eq('user_id', user.id)
-
     if (ratings && ratings.length > 0) {
       const prefilled: Record<number, number> = {}
-      ratings.forEach(r => {
-        prefilled[Number(r.film_id)] = r.rating
-      })
+      ratings.forEach(r => { prefilled[Number(r.film_id)] = r.rating })
       setVotes(prev => ({ ...prefilled, ...prev }))
     }
   }
@@ -80,27 +168,17 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     await fetchPastRatings()
   }
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.user_metadata?.username) {
-        setName(user.user_metadata.username)
-      }
-    })
+  const vote = useCallback((filmId: number, stars: number) => {
+    setVotes(prev => ({ ...prev, [filmId]: stars }))
   }, [])
 
-  function vote(filmId: number, stars: number) {
-    setVotes(prev => ({ ...prev, [filmId]: stars }))
-  }
-
   async function submitVotes() {
-    const { data, error } = await supabase.from('participants').insert({
+    await supabase.from('participants').insert({
       session_id: id,
-      name: name,
-      votes: votes,
-      mode: mode
+      name,
+      votes,
+      mode
     })
-    console.log('insert result:', data, error)
-
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const ratingRows = films
@@ -114,15 +192,10 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           film_genres: [],
           rating: votes[film.id]
         }))
-
       if (ratingRows.length > 0) {
-        const { error: ratingsError } = await supabase
-          .from('user_ratings')
-          .upsert(ratingRows, { onConflict: 'user_id,film_id' })
-        console.log('ratings saved:', ratingsError)
+        await supabase.from('user_ratings').upsert(ratingRows, { onConflict: 'user_id,film_id' })
       }
     }
-
     setDone(true)
     fetchParticipants()
   }
@@ -134,7 +207,6 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }
 
   const allVoted = films.length > 0 && films.every(f => votes[f.id] !== undefined && votes[f.id] !== null)
-
   if (done) {
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
@@ -195,18 +267,22 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           className="w-full border border-gray-200 rounded-xl px-4 py-3 mb-6 outline-none focus:border-gray-400"
         />
         {sessionMode && (
-          <div className="flex items-center gap-2 mb-6 bg-gray-800 rounded-xl px-4 py-3">
-            <span className="text-lg">{sessionMode === 'rated' ? '🌟' : '🎲'}</span>
-            <div>
+          <div className="bg-gray-800 rounded-xl px-4 py-3 mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{sessionMode === 'rated' ? '🌟' : '🎲'}</span>
               <p className="text-sm font-medium text-white">
                 {sessionMode === 'rated' ? 'Something we love' : 'Surprise us'}
               </p>
-              <p className="text-xs text-gray-400">
-                {sessionMode === 'rated' 
-                  ? 'Rate films you know to find your best match'
-                  : 'Find something none of you have seen before'}
-              </p>
             </div>
+            {sessionGenres.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {sessionGenres.map(genre => (
+                  <span key={genre} className="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full">
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <button
@@ -245,43 +321,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               <div className="p-2">
                 <p className="text-xs font-medium mb-1 leading-tight">{film.title}</p>
                 <p className="text-xs text-gray-400 mb-2">{film.year}</p>
-                <div className="flex justify-center gap-0 py-1">
-                  {[1,2,3,4,5].map(star => {
-                    const currentVal = hoveredStar?.filmId === film.id
-                      ? hoveredStar.star
-                      : (votes[film.id] ?? 0)
-                    const isNegative = currentVal === -1 || currentVal === -2
-                    const fullActive = !isNegative && star <= currentVal
-                    const halfActive = !isNegative && star - 0.5 === currentVal
-                    return (
-                      <div key={star} className="relative" style={{width: '22px', height: '22px'}}>
-                        <button
-                          onClick={() => vote(film.id, star - 0.5)}
-                          onMouseEnter={() => setHoveredStar({ filmId: film.id, star: star - 0.5 })}
-                          onMouseLeave={() => setHoveredStar(null)}
-                          className="absolute left-0 top-0 w-1/2 h-full z-10 opacity-0"
-                        />
-                        <button
-                          onClick={() => vote(film.id, star)}
-                          onMouseEnter={() => setHoveredStar({ filmId: film.id, star })}
-                          onMouseLeave={() => setHoveredStar(null)}
-                          className="absolute right-0 top-0 w-1/2 h-full z-10 opacity-0"
-                        />
-                        <span className="absolute inset-0 flex items-center justify-center text-lg pointer-events-none select-none text-gray-300">
-                          ★
-                        </span>
-                        {(fullActive || halfActive) && (
-                          <span
-                            className="absolute inset-0 flex items-center justify-center text-lg pointer-events-none select-none text-yellow-400 overflow-hidden"
-                            style={{ clipPath: halfActive ? 'inset(0 50% 0 0)' : 'none' }}
-                          >
-                            ★
-                          </span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                <StarRating filmId={film.id} value={votes[film.id]} onVote={vote} />
                 {votes[film.id] !== undefined && votes[film.id]! > 0 && (
                   <p className="text-center text-xs text-gray-400 mb-1">{votes[film.id]}★</p>
                 )}
