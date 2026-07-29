@@ -249,8 +249,8 @@ async function saveAvatar(emoji: string) {
                         <span className="text-gray-500 text-xs text-center p-2">{film.film_title}</span>
                       </div>
                     )}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent px-2 py-1.5">
-                      <p className="text-blue-400 text-xs">🕐 Watch later</p>
+                    <div className="absolute bottom-1 left-1">
+                      <span className="text-base">🕐</span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-300 leading-tight truncate">{film.film_title}</p>
