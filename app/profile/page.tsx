@@ -51,6 +51,14 @@ export default function ProfilePage() {
   useEffect(() => {
     loadProfile()
   }, [])
+  async function deleteAccount() {
+    const confirmed = window.confirm('Are you sure you want to delete your account? This cannot be undone.')
+    if (!confirmed) return
+    await supabase.from('user_ratings').delete().eq('user_id', user.id)
+    await supabase.auth.admin.deleteUser(user.id)
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
 async function saveAvatar(emoji: string) {
     const { error } = await supabase.auth.updateUser({
       data: { avatar: emoji }
@@ -300,15 +308,23 @@ async function saveAvatar(emoji: string) {
                 </button>
               ))}
             </div>
-            <button
+           <button
               onClick={() => saveAvatar('')}
-              className="w-full mt-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-xl hover:bg-gray-800 transition-all"
+              className="w-full mt-4 py-2.5 text-sm text-gray-400 border border-gray-700 rounded-xl hover:bg-gray-800 transition-all"
             >
-              Reset to default
+              Reset to initials
             </button>
           </div>
         </div>
       )}
+      <div className="px-6 mt-4">
+        <button
+          onClick={deleteAccount}
+          className="w-full py-3 rounded-xl border border-red-900 text-red-400 text-sm hover:bg-red-950 transition-all"
+        >
+          Delete account
+        </button>
+      </div>
     </main>
   )
 }
