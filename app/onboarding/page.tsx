@@ -44,6 +44,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -53,6 +54,7 @@ export default function OnboardingPage() {
       if (data.user.user_metadata?.full_name) {
         setUsername(data.user.user_metadata.full_name.split(' ')[0])
       }
+      setChecking(false)
     })
   }, [])
 
@@ -73,6 +75,8 @@ export default function OnboardingPage() {
       router.push('/')
     }
   }
+
+  if (checking) return null
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-8">
