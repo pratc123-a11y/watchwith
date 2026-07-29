@@ -112,10 +112,38 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [mode, setMode] = useState<'rated' | 'unseen' | null>(null)
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
+  const [resultsReady, setResultsReady] = useState(false)
 
   useEffect(() => {
     fetchParticipants()
     fetchFilms()
+
+    const participantsSub = supabase
+      .channel(`participants-${id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'participants',
+        filter: `session_id=eq.${id}`
+      }, () => fetchParticipants())
+      .subscribe()
+
+    const sessionSub = supabase
+      .channel(`session-${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'sessions',
+        filter: `id=eq.${id}`
+      }, (payload: any) => {
+        if (payload.new.results_ready) setResultsReady(true)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(participantsSub)
+      supabase.removeChannel(sessionSub)
+    }
   }, [])
 
   useEffect(() => {
@@ -129,7 +157,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   async function fetchFilms() {
     const { data } = await supabase
       .from('sessions')
-      .select('film_list, mode, genres')
+      .select('film_list, mode, genres, results_ready')
       .eq('id', id)
       .single()
     if (data?.film_list) setFilms(data.film_list)
@@ -138,6 +166,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       setMode(data.mode)
     }
     if (data?.genres) setSessionGenres(data.genres)
+    if (data?.results_ready) setResultsReady(true)
   }
 
   async function fetchParticipants() {
@@ -173,13 +202,15 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }, [])
 
   async function submitVotes() {
+    const { data: { user } } = await supabase.auth.getUser()
+    const avatar = user?.user_metadata?.avatar || null
     await supabase.from('participants').insert({
       session_id: id,
       name,
       votes,
-      mode
+      mode,
+      avatar
     })
-    const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const ratingRows = films
         .filter(film => votes[film.id] !== undefined && votes[film.id] !== null)
@@ -211,25 +242,41 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     return (
       <main className="min-h-screen p-8 max-w-md mx-auto">
         <h1 className="text-2xl font-medium mb-2">Thanks {name}!</h1>
-        <p className="text-gray-500 mb-8">Your votes are in. Waiting for others to join...</p>
+        <p className="text-gray-500 mb-6">Your votes are in. Waiting for others to join...</p>
+        <p className="text-xs text-gray-600 mb-8">Visit the results page to save this session to your history.</p>
         <div className="bg-gray-800 rounded-xl p-4 mb-6">
           <p className="text-sm font-medium mb-3 text-white">Who's joined so far ({participants.length})</p>
           {participants.map(p => (
             <div key={p.id} className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-full bg-white text-black flex items-center justify-center text-xs">
-                {p.name[0].toUpperCase()}
+              <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-sm">
+                {p.avatar || p.name[0].toUpperCase()}
               </div>
               <span className="text-sm text-white">{p.name}</span>
               <span className="text-xs text-green-500 ml-auto">✓ voted</span>
             </div>
           ))}
         </div>
-        <a
-          href={`/session/${id}/results`}
-          className="w-full bg-purple-700 text-white py-3 rounded-xl text-sm mb-3 font-medium text-center block"
-        >
-          See group results
-        </a>
+        {resultsReady ? (
+          <a
+            href={`/session/${id}/results`}
+            className="w-full bg-purple-700 text-white py-3 rounded-xl text-sm mb-3 font-medium text-center block"
+          >
+            See group results
+          </a>
+        ) : (
+          <button
+            onClick={async () => {
+              await supabase
+                .from('sessions')
+                .update({ results_ready: true })
+                .eq('id', id)
+              window.location.href = `/session/${id}/results`
+            }}
+            className="w-full bg-purple-700 text-white py-3 rounded-xl text-sm mb-3 font-medium text-center block"
+          >
+            See group results
+          </button>
+        )}
         <button
           onClick={copyLink}
           className="w-full border border-gray-400 text-gray-100 py-3 rounded-xl text-sm mt-3"
@@ -252,10 +299,11 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           )}
           {participants.map(p => (
             <div key={p.id} className="flex items-center gap-2 mb-2">
-              <div className="w-6 h-6 rounded-full bg-white text-black flex items-center justify-center text-xs">
-                {p.name[0].toUpperCase()}
+              <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-sm">
+                {p.avatar || p.name[0].toUpperCase()}
               </div>
               <span className="text-sm text-white">{p.name}</span>
+              <span className="text-xs text-green-500 ml-auto">✓ voted</span>
             </div>
           ))}
         </div>
@@ -284,6 +332,14 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               </div>
             )}
           </div>
+        )}
+        {resultsReady && (
+          <a
+            href={`/session/${id}/results`}
+            className="w-full bg-green-700 text-white py-3 rounded-xl text-sm mb-3 font-medium text-center block"
+          >
+            Results are ready — view now
+          </a>
         )}
         <button
           onClick={joinSession}
@@ -331,7 +387,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                     className={`text-xs px-1.5 py-0.5 rounded border transition-all ${
                       votes[film.id] === -1
                         ? 'bg-blue-100 border-blue-300 text-blue-700'
-                        : 'border-gray-200 text-gray-400'
+                        : 'border-gray-200 text-gray.400'
                     }`}
                   >
                     🕐 Watch later

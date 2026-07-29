@@ -49,6 +49,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [groupSummary, setGroupSummary] = useState<string>('')
   const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
   const [watchedFilms, setWatchedFilms] = useState<Set<number>>(new Set())
+  const [userRatedIds, setUserRatedIds] = useState<Set<number>>(new Set())
   const [loadingMessage, setLoadingMessage] = useState(0)
   const [historySaved, setHistorySaved] = useState(false)
   const loadingMessages = [
@@ -63,15 +64,31 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     if (!loading) return
+    setLoadingMessage(Math.floor(Math.random() * loadingMessages.length))
     const interval = setInterval(() => {
-      setLoadingMessage(prev => (prev + 1) % loadingMessages.length)
+      setLoadingMessage(Math.floor(Math.random() * loadingMessages.length))
     }, 5500)
     return () => clearInterval(interval)
   }, [loading])
 
   useEffect(() => {
     fetchAndScore()
+    fetchUserRatings()
   }, [])
+
+  async function fetchUserRatings() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('user_ratings')
+      .select('film_id, rating')
+      .eq('user_id', user.id)
+      .gt('rating', 0)
+    if (data) {
+      setUserRatedIds(new Set(data.map(r => Number(r.film_id))))
+      setWatchedFilms(new Set(data.map(r => Number(r.film_id))))
+    }
+  }
 
  async function fetchStreaming(tmdbId: number): Promise<{name: string, logo: string, link: string}[]> {
     try {
@@ -572,19 +589,21 @@ async function markWatched(film: Film) {
               )}
               <div className="flex items-center gap-3 mb-3">
                 <button
-                  onClick={e => { e.stopPropagation(); markWatched(result.film) }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    watchedFilms.has(result.film.id)
-                      ? 'bg-green-900 text-green-300 border border-green-700'
-                      : 'border border-gray-600 text-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={watchedFilms.has(result.film.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                  </svg>
-                  {watchedFilms.has(result.film.id) ? 'Watched' : 'Mark as watched'}
-                </button>
+                onClick={e => { e.stopPropagation(); if (!userRatedIds.has(result.film.id)) markWatched(result.film) }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  watchedFilms.has(result.film.id)
+                    ? 'bg-green-900 text-green-300 border border-green-700'
+                    : 'border border-gray-600 text-gray-300 hover:border-gray-400'
+                }`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill={watchedFilms.has(result.film.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                {watchedFilms.has(result.film.id)
+                  ? userRatedIds.has(result.film.id) ? 'Already rated' : 'Watched'
+                  : 'Mark as watched'}
+              </button>
               </div>
               <div className="flex flex-col gap-3">
                 {result.film.cast.length > 0 && (
