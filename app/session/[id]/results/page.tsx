@@ -105,11 +105,19 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
     const topTitles = topFilms.slice(0, 3).map(r => r.film.title).join(', ')
     const topGenres = [...new Set(topFilms.flatMap(r => r.film.genres.slice(0, 2)))].slice(0, 4).join(', ')
 
+   const isSolo = participantData.length === 1
     const prompt = mode === 'unseen'
-      ? `A group of friends (${names}) want to discover new films tonight. They picked genres: ${genres.join(', ')}.
+      ? isSolo
+        ? `${names} wants to discover new films tonight. They picked genres: ${genres.join(', ')}.
+Top recommendations: ${topTitles}.
+Write ONE sentence (max 25 words) explaining why these films suit their taste. Be warm and specific. Don't start with "Based on".`
+        : `A group of friends (${names}) want to discover new films tonight. They picked genres: ${genres.join(', ')}.
 Top recommendations: ${topTitles}.
 Write ONE sentence (max 25 words) explaining what this group has in common and why these films suit them. Be warm and specific. Don't start with "Based on".`
-      : `A group of friends (${names}) rated films together. Top matches: ${topTitles}. Common genres: ${topGenres}.
+      : isSolo
+        ? `${names} rated some films. Top matches: ${topTitles}. Favourite genres: ${topGenres}.
+Write ONE sentence (max 25 words) explaining why these films match their personal taste. Be warm and specific. Don't refer to them as a group. Don't start with "Based on".`
+        : `A group of friends (${names}) rated films together. Top matches: ${topTitles}. Common genres: ${topGenres}.
 Write ONE sentence (max 25 words) summarising what this group has in common taste-wise and why these picks work for everyone. Be warm and specific. Don't start with "Based on".`
 
     try {
@@ -438,8 +446,9 @@ async function markWatched(film: Film) {
         {sessionMode === 'unseen' ? 'Something new to discover' : 'Best matches'}
       </h1>
       <p className="text-gray-100 mb-2">
-        Based on {participants.length} {participants.length === 1 ? 'person' : 'people'} —{' '}
-        {participants.map(p => p.name).join(', ')}
+        {participants.length === 1
+          ? `Personal picks for ${participants[0]?.name}`
+          : `Based on ${participants.length} people — ${participants.map(p => p.name).join(', ')}`}
       </p>
       {sessionMode === 'unseen' && (
         <p className="text-xs text-gray-200 mb-4">
