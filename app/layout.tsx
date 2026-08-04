@@ -15,7 +15,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "WatchWith",
-  description: "Stop arguing about what to watch.",
+  description: "Stop arguing about what to watch. Everyone rates a few films — we find what works for the whole group.",
+  openGraph: {
+    title: "WatchWith",
+    description: "Stop arguing about what to watch. Everyone rates a few films — we find what works for the whole group.",
+    url: "https://watchwith-one.vercel.app",
+    siteName: "WatchWith",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "WatchWith",
+    description: "Stop arguing about what to watch. Everyone rates a few films — we find what works for the whole group.",
+  },
+  icons: {
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>",
+  },
 };
 
 export default function RootLayout({

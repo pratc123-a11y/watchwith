@@ -249,7 +249,7 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
   async function fetchAndScore() {
     const { data: sessionData } = await supabase
       .from('sessions')
-      .select('mode, genres')
+      .select('mode, genres, film_list')
       .eq('id', id)
       .single()
 
@@ -279,10 +279,16 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
     setLoading(false)
       return
     }
+   const sessionFilmList = sessionData?.film_list || []
     const allFilmIds = new Set<string>()
-    participantData.forEach(p => {
-      Object.keys(p.votes).forEach(fid => allFilmIds.add(fid))
-    })
+
+    if (sessionFilmList.length > 0) {
+      sessionFilmList.forEach((f: any) => allFilmIds.add(String(f.id)))
+    } else {
+      participantData.forEach(p => {
+        Object.keys(p.votes).forEach(fid => allFilmIds.add(fid))
+      })
+    }
 
     const filmDetails = await Promise.all(
       Array.from(allFilmIds).map(async fid => {
@@ -654,10 +660,78 @@ async function markWatched(film: Film) {
       ))}
       <div className="px-6 mt-4 mb-8">
         <button
-          onClick={() => {
+          onClick={async () => {
             setLoading(true)
             setResults([])
             setGroupSummary('')
+            setHistorySaved(false)
+
+            const { data: sessionData } = await supabase
+              .from('sessions')
+              .select('genres')
+              .eq('id', id)
+              .single()
+
+            const genres: string[] = sessionData?.genres || []
+            const genreMap: Record<string, number> = {
+              'Action': 28, 'Adventure': 12, 'Animation': 16, 'Comedy': 35,
+              'Crime': 80, 'Documentary': 99, 'Drama': 18, 'Fantasy': 14,
+              'Horror': 27, 'Mystery': 9648, 'Romance': 10749,
+              'Sci-Fi': 878, 'Thriller': 53, 'War': 10752
+            }
+
+            let newFilms: any[] = []
+
+            if (genres.length > 0) {
+              const perGenre = Math.ceil(12 / genres.length)
+              const results = await Promise.all(
+                genres.map(async genre => {
+                  const genreId = genreMap[genre]
+                  if (!genreId) return []
+                  const page = Math.floor(Math.random() * 5) + 1
+                  const res = await fetch(
+                    `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&with_genres=${genreId}&sort_by=vote_average.desc&vote_count.gte=500&page=${page}`
+                  )
+                  const data = await res.json()
+                  return data.results
+                    .filter((f: any) => f.poster_path)
+                    .slice(0, perGenre + 2)
+                })
+              )
+              const seen = new Set<number>()
+              for (const batch of results) {
+                for (const f of batch) {
+                  if (!seen.has(f.id)) {
+                    seen.add(f.id)
+                    newFilms.push(f)
+                  }
+                }
+              }
+            } else {
+              const page = Math.floor(Math.random() * 8) + 1
+              const res = await fetch(
+                `https://api.themoviedb.org/3/movie/top_rated?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&page=${page}`
+              )
+              const data = await res.json()
+              newFilms = data.results.filter((f: any) => f.poster_path)
+            }
+
+            newFilms = newFilms
+              .sort(() => Math.random() - 0.5)
+              .slice(0, 12)
+              .map((f: any) => ({
+                id: f.id,
+                title: f.title,
+                year: f.release_date?.slice(0, 4),
+                poster: f.poster_path,
+                genres: f.genre_ids
+              }))
+
+            await supabase
+              .from('sessions')
+              .update({ film_list: newFilms })
+              .eq('id', id)
+
             setRefreshCount(prev => prev + 1)
           }}
           className="w-full border border-gray-700 text-gray-300 py-3 rounded-xl text-sm hover:bg-gray-800 transition-all"
