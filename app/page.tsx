@@ -89,12 +89,14 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [selectedGenres, setSelectedGenres] = useState<number[]>([])
   const [user, setUser] = useState<any>(null)
+  const [userLoaded, setUserLoaded] = useState(false)
   const [excludeWatched, setExcludeWatched] = useState(false)
   const [watchedFilmIds, setWatchedFilmIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
+      setUserLoaded(true)
       if (data.user) {
         fetchWatchedFilms(data.user.id)
         if (!data.user.user_metadata?.username) {
@@ -172,6 +174,76 @@ export default function Home() {
     })
     router.push(`/session/${id}`)
   }
+  if (!userLoaded) {
+    return (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+      </main>
+    )
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <h1 className="text-5xl font-medium mb-3">
+            watch<span className="text-purple-400">with</span>
+          </h1>
+          <p className="text-xl text-gray-200 mb-2">Stop arguing about what to watch.</p>
+          <p className="text-gray-400 text-sm mb-12 max-w-xs">
+            Everyone rates a few films. We find what works for the whole group — instantly.
+          </p>
+
+          <div className="w-full max-w-sm mb-12">
+            <div className="flex flex-col gap-4">
+              {[
+                { emoji: '🎬', step: '1', title: 'Start a session', desc: 'Pick your genres and create a shareable link' },
+                { emoji: '⭐', step: '2', title: 'Everyone rates', desc: 'Your group rates films on their own devices' },
+                { emoji: '🍿', step: '3', title: 'Get your match', desc: 'We find the best film for the whole group' },
+              ].map(item => (
+                <div key={item.step} className="flex items-start gap-4 text-left bg-gray-900 border border-gray-800 rounded-2xl p-4">
+                  <div className="w-10 h-10 rounded-full bg-purple-900 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xl">{item.emoji}</span>
+                  </div>
+                  <div>
+                    <p className="text-white font-medium mb-0.5">{item.title}</p>
+                    <p className="text-gray-400 text-sm">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="w-full max-w-sm flex flex-col gap-3">
+            <a
+              href="/auth"
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white py-3 rounded-xl font-medium text-center transition-all"
+            >
+              Get started
+            </a>
+            <button
+              onClick={async () => {
+                setUserLoaded(false)
+                const id = generateId()
+                const films = await fetchRandomFilms()
+                await supabase.from('sessions').insert({
+                  id,
+                  films: [],
+                  film_list: films,
+                  mode: 'rated',
+                  genres: []
+                })
+                router.push(`/session/${id}`)
+              }}
+              className="w-full border border-gray-700 text-gray-300 py-3 rounded-xl text-sm font-medium hover:bg-gray-800 transition-all"
+            >
+              Try without an account
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-6">
@@ -185,7 +257,10 @@ export default function Home() {
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 mb-4">
           <h2 className="text-base font-medium text-white mb-1">Start a session</h2>
-          <p className="text-gray-200 text-sm mb-5">What are you in the mood for? <span className="text-gray-500">(pick up to 2)</span></p>
+          <p className="text-gray-200 text-sm mb-5">
+            What are you in the mood for?
+            <span className="text-gray-300"> (pick up to 2)</span>
+          </p>
 
           <div className="grid grid-cols-2 gap-2 mb-5">
             {GENRES.map(genre => (
@@ -234,7 +309,7 @@ export default function Home() {
           <div className="bg-gray-900 border border-gray-800 rounded-2xl px-4 py-3 flex items-center justify-between">
             <a href="/profile" className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-sm font-medium">
-                {user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
+                {user?.user_metadata?.avatar || user?.user_metadata?.username?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
               </div>
               <div>
                 <p className="text-xs text-gray-400">Signed in as</p>
