@@ -199,15 +199,6 @@ async function saveAvatar(emoji: string) {
               {stats.total} films rated · {stats.avg}★ avg
             </p>
           )}
-          {topGenres.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {topGenres.map(g => (
-                <span key={g.name} className="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full">
-                  {g.emoji} {g.name}
-                </span>
-              ))}
-            </div>
-          )}
           </div>
         </div>
       </div>
@@ -237,7 +228,20 @@ async function saveAvatar(emoji: string) {
             </a>
           </div>
         )}
-
+{topGenres.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-white font-medium mb-1">Your taste</h2>
+            <p className="text-gray-500 text-xs mb-3">Based on your highest rated films</p>
+            <div className="flex gap-2">
+              {topGenres.map(g => (
+                <div key={g.name} className="flex-1 bg-gray-900 border border-gray-800 rounded-2xl p-3 text-center">
+                  <p className="text-2xl mb-1">{g.emoji}</p>
+                  <p className="text-white text-xs font-medium">{g.name}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {topFilms.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
