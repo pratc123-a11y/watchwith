@@ -20,6 +20,7 @@ export default function ProfilePage() {
  const [user, setUser] = useState<any>(null)
   const [ratings, setRatings] = useState<Rating[]>([])
   const [loading, setLoading] = useState(true)
+  const [topGenres, setTopGenres] = useState<{name: string, emoji: string}[]>([])
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   const AVATARS = [
@@ -63,6 +64,45 @@ async function saveAvatar(emoji: string) {
     }
     setShowAvatarPicker(false)
   }
+  const GENRE_EMOJIS: Record<string, string> = {
+    'Action': '💥', 'Adventure': '🗺️', 'Animation': '🎨',
+    'Comedy': '😂', 'Crime': '🔫', 'Documentary': '🎥',
+    'Drama': '🎭', 'Fantasy': '🧙', 'Horror': '👻',
+    'Mystery': '🔍', 'Romance': '❤️', 'Science Fiction': '🚀',
+    'Sci-Fi': '🚀', 'Thriller': '😰', 'War': '⚔️',
+    'Music': '🎵', 'Family': '👨‍👩‍👧', 'History': '📜',
+    'Western': '🤠', 'TV Movie': '📺'
+  }
+
+  async function calculateTopGenres(ratingsData: Rating[]) {
+    const genreScores: Record<string, number> = {}
+    const ratedFilms = ratingsData.filter(r => r.rating > 0)
+
+    await Promise.all(
+      ratedFilms.slice(0, 20).map(async r => {
+        try {
+          const res = await fetch(
+            `https://api.themoviedb.org/3/movie/${r.film_id}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}`
+          )
+          const data = await res.json()
+          const genres: string[] = data.genres?.map((g: any) => g.name) || []
+          genres.forEach(g => {
+            genreScores[g] = (genreScores[g] || 0) + r.rating
+          })
+        } catch {}
+      })
+    )
+
+    const sorted = Object.entries(genreScores)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => ({
+        name,
+        emoji: GENRE_EMOJIS[name] || '🎬'
+      }))
+
+    setTopGenres(sorted)
+  }
   async function loadProfile() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -75,7 +115,10 @@ async function saveAvatar(emoji: string) {
       .select('*')
       .eq('user_id', user.id)
       .order('rating', { ascending: false })
-    if (ratings) setRatings(ratings)
+    if (ratings) {
+      setRatings(ratings)
+      calculateTopGenres(ratings)
+    }
     setLoading(false)
   }
 
@@ -152,10 +195,19 @@ async function saveAvatar(emoji: string) {
             </h1>
             <p className="text-gray-300 text-sm">{user?.email}</p>
             {stats && (
-              <p className="text-gray-400 text-xs mt-1">
-                {stats.total} films rated · {stats.avg}★ avg
-              </p>
-            )}
+            <p className="text-gray-300 text-xs mt-1">
+              {stats.total} films rated · {stats.avg}★ avg
+            </p>
+          )}
+          {topGenres.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {topGenres.map(g => (
+                <span key={g.name} className="text-xs bg-purple-900 text-purple-200 px-2 py-0.5 rounded-full">
+                  {g.emoji} {g.name}
+                </span>
+              ))}
+            </div>
+          )}
           </div>
         </div>
       </div>
