@@ -306,12 +306,30 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             See group results
           </button>
         )}
-        <button
-          onClick={copyLink}
-          className="w-full border border-gray-400 text-gray-100 py-3 rounded-xl text-sm mt-3"
-        >
-          {copied ? 'Link copied!' : 'Copy invite link'}
-        </button>
+        <div className="flex flex-col gap-2 mt-3">
+          <a
+            href={`https://wa.me/?text=Join%20my%20WatchWith%20session!%20${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-green-700 text-white py-3 rounded-xl text-sm font-medium text-center block"
+          >
+            Share via WhatsApp
+          </a>
+          <a
+            href={`https://www.facebook.com/dialog/send?link=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}&app_id=YOUR_FB_APP_ID&redirect_uri=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full bg-blue-700 text-white py-3 rounded-xl text-sm font-medium text-center block"
+          >
+            Share via Messenger
+          </a>
+          <button
+            onClick={copyLink}
+            className="w-full border border-gray-400 text-gray-100 py-3 rounded-xl text-sm"
+          >
+            {copied ? 'Link copied!' : 'Copy link'}
+          </button>
+        </div>
       </main>
     )
   }
@@ -436,6 +454,11 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             </div>
           ))}
         </div>
+      )}
+      {!allVoted && Object.keys(votes).length > 0 && (
+        <p className="text-center text-xs text-gray-400 mb-3">
+          Please rate all {films.length - Object.keys(votes).length} remaining films to continue
+        </p>
       )}
       {allVoted && (
         <button

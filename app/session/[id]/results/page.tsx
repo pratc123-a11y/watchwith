@@ -52,6 +52,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [userRatedIds, setUserRatedIds] = useState<Set<number>>(new Set())
   const [loadingMessage, setLoadingMessage] = useState(0)
   const [historySaved, setHistorySaved] = useState(false)
+  const [refreshCount, setRefreshCount] = useState(0)
   const loadingMessages = [
     "Calculating... slower than a hobbit leaving the Shire 🧙",
     "Almost there... the sorting hat is still thinking 🎩",
@@ -74,7 +75,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     fetchAndScore()
     fetchUserRatings()
-  }, [])
+  }, [refreshCount])
 
   async function fetchUserRatings() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -334,15 +335,24 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
 
       const ratedVotes = breakdown.filter(b => b.vote > 0)
       if (ratedVotes.length === 0) continue
+      const participationRate = ratedVotes.length / participantData.length
 
       const avgScore = totalScore / ratedVotes.length
       const watchLaterCount = breakdown.filter(b => b.vote === -1).length
       const groupSize = participantData.length
       const ratedCount = ratedVotes.length
 
-     const groupScore = ratedVotes.every(v => v.vote >= 3)
+     const filmGenreNames = film.genres.map((g: any) =>
+        typeof g === 'string' ? g : g.name
+      )
+      const genreMatch = sessionGenres.length > 0 &&
+        filmGenreNames.some((g: string) => sessionGenres.includes(g))
+
+      const baseScore = ratedVotes.every(v => v.vote >= 3)
         ? avgScore
         : avgScore * (lowestScore / 5)
+
+      const groupScore = (genreMatch ? baseScore * 1.5 : baseScore * 0.7) * participationRate
       scored.push({
         film,
         score: Math.round(avgScore * 10) / 10,
@@ -642,6 +652,19 @@ async function markWatched(film: Film) {
           )}
         </div>
       ))}
+      <div className="px-6 mt-4 mb-8">
+        <button
+          onClick={() => {
+            setLoading(true)
+            setResults([])
+            setGroupSummary('')
+            setRefreshCount(prev => prev + 1)
+          }}
+          className="w-full border border-gray-700 text-gray-300 py-3 rounded-xl text-sm hover:bg-gray-800 transition-all"
+        >
+          🔄 Get different recommendations
+        </button>
+      </div>
     </main>
   )
 }
