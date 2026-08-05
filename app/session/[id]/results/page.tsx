@@ -377,7 +377,60 @@ const filmGenreNames = film.genres.map((g: any) =>
     const shuffled = refreshCount > 0
       ? [...topScored].sort(() => Math.random() - 0.5)
       : topScored
-    const top5 = shuffled.slice(0, 5)
+    let top5 = shuffled.slice(0, 5)
+
+    if (top5.length < 3 && genres.length > 0) {
+      console.log('Not enough genre matches — fetching fresh from TMDB')
+      const genreMap: Record<string, number> = {
+        'Action': 28, 'Adventure': 12, 'Animation': 16, 'Comedy': 35,
+        'Crime': 80, 'Documentary': 99, 'Drama': 18, 'Fantasy': 14,
+        'Horror': 27, 'Mystery': 9648, 'Romance': 10749,
+        'Sci-Fi': 878, 'Thriller': 53, 'War': 10752
+      }
+      const genreIds = genres.map(g => genreMap[g]).filter(Boolean).join(',')
+      const page = Math.floor(Math.random() * 5) + 1
+      const res = await fetch(
+        `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&with_genres=${genreIds}&sort_by=vote_average.desc&vote_count.gte=500&page=${page}`
+      )
+      const data = await res.json()
+      const freshFilms = data.results
+        .filter((f: any) => f.poster_path)
+        .slice(0, 5)
+
+      const freshDetails = await Promise.all(
+        freshFilms.map(async (f: any) => {
+          const res = await fetch(
+            `https://api.themoviedb.org/3/movie/${f.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
+          )
+          const data = await res.json()
+          const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+          const cast = data.credits?.cast?.slice(0, 3).map((c: any) => c.name) || []
+          const streaming = await fetchStreaming(data.id)
+          return {
+            film: {
+              id: data.id,
+              title: data.title,
+              year: data.release_date?.slice(0, 4),
+              poster: data.poster_path,
+              genres: data.genres?.map((g: any) => g.name) || [],
+              director,
+              tmdbRating: Math.round(data.vote_average * 10) / 10,
+              streaming,
+              synopsis: data.overview || '',
+              cast,
+              runtime: data.runtime || 0,
+              language: data.original_language?.toUpperCase() || ''
+            },
+            score: 0,
+            groupScore: f.vote_average,
+            breakdown: [],
+            lowestScore: 0,
+            watchLaterCount: 0,
+          } as FilmResult
+        })
+      )
+      top5 = freshDetails
+    }
 
     setResults(top5)
     const summary = await generateGroupSummary(participantData, top5, mode, genres)
