@@ -394,7 +394,19 @@ const filmGenreNames = film.genres.map((g: any) =>
       )
       const data = await res.json()
       const freshFilms = data.results
-        .filter((f: any) => f.poster_path)
+        .filter((f: any) => {
+          if (!f.poster_path) return false
+          const primaryGenreId = f.genre_ids?.[0]
+          const secondaryGenreId = f.genre_ids?.[1]
+          const selectedGenreIds = genres.map((g: string) => ({
+            'Action': 28, 'Adventure': 12, 'Animation': 16, 'Comedy': 35,
+            'Crime': 80, 'Documentary': 99, 'Drama': 18, 'Fantasy': 14,
+            'Horror': 27, 'Mystery': 9648, 'Romance': 10749,
+            'Sci-Fi': 878, 'Thriller': 53, 'War': 10752
+          })[g]).filter(Boolean)
+          return selectedGenreIds.includes(primaryGenreId) ||
+            selectedGenreIds.includes(secondaryGenreId)
+        })
         .slice(0, 5)
 
       const freshDetails = await Promise.all(
