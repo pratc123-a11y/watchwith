@@ -257,6 +257,7 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
     const genres: string[] = sessionData?.genres || []
     setSessionMode(mode)
     setSessionGenres(genres)
+    console.log('Session genres:', genres)
 
     const { data: participantData } = await supabase
       .from('participants')
@@ -342,17 +343,22 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
       const groupSize = participantData.length
       const ratedCount = ratedVotes.length
 
-     const filmGenreNames = film.genres.map((g: any) =>
+const filmGenreNames = film.genres.map((g: any) =>
         typeof g === 'string' ? g : g.name
       )
-      const genreMatch = sessionGenres.length > 0 &&
+      const genreMatch = sessionGenres.length === 0 ||
         filmGenreNames.some((g: string) => sessionGenres.includes(g))
+
+      if (sessionGenres.length > 0 && !genreMatch) {
+        console.log(`Excluded ${film.title} — genres: ${filmGenreNames.join(', ')} don't match ${sessionGenres.join(', ')}`)
+        continue
+      }
 
       const baseScore = ratedVotes.every(v => v.vote >= 3)
         ? avgScore
         : avgScore * (lowestScore / 5)
 
-      const groupScore = (genreMatch ? baseScore * 1.5 : baseScore * 0.7) * participationRate
+      const groupScore = baseScore
       scored.push({
         film,
         score: Math.round(avgScore * 10) / 10,
@@ -663,7 +669,115 @@ async function markWatched(film: Film) {
             setResults([])
             setGroupSummary('')
             setHistorySaved(false)
-            setRefreshCount(prev => prev + 1)
+
+            const { data: sessionData } = await supabase
+              .from('sessions')
+              .select('genres, mode')
+              .eq('id', id)
+              .single()
+
+            const genres: string[] = sessionData?.genres || []
+            const genreMap: Record<string, number> = {
+              'Action': 28, 'Adventure': 12, 'Animation': 16, 'Comedy': 35,
+              'Crime': 80, 'Documentary': 99, 'Drama': 18, 'Fantasy': 14,
+              'Horror': 27, 'Mystery': 9648, 'Romance': 10749,
+              'Sci-Fi': 878, 'Thriller': 53, 'War': 10752
+            }
+
+            const { data: participantData } = await supabase
+              .from('participants')
+              .select('votes')
+              .eq('session_id', id)
+
+            const alreadyVotedIds = new Set<string>()
+            participantData?.forEach(p => {
+              Object.keys(p.votes).forEach(fid => alreadyVotedIds.add(fid))
+            })
+
+            let newFilms: any[] = []
+
+            if (genres.length > 0) {
+              const results = await Promise.all(
+                genres.map(async genre => {
+                  const genreId = genreMap[genre]
+                  if (!genreId) return []
+                  const page = Math.floor(Math.random() * 8) + 1
+                  const res = await fetch(
+                    `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&with_genres=${genreId}&sort_by=vote_average.desc&vote_count.gte=500&page=${page}`
+                  )
+                  const data = await res.json()
+                  return data.results.filter((f: any) =>
+                    f.poster_path && !alreadyVotedIds.has(String(f.id))
+                  ).slice(0, 8)
+                })
+              )
+              const seen = new Set<number>()
+              for (const batch of results) {
+                for (const f of batch) {
+                  if (!seen.has(f.id)) {
+                    seen.add(f.id)
+                    newFilms.push(f)
+                  }
+                }
+              }
+            } else {
+              const page = Math.floor(Math.random() * 8) + 1
+              const res = await fetch(
+                `https://api.themoviedb.org/3/movie/top_rated?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&page=${page}`
+              )
+              const data = await res.json()
+              newFilms = data.results.filter((f: any) =>
+                f.poster_path && !alreadyVotedIds.has(String(f.id))
+              )
+            }
+
+            const freshFilms = newFilms
+              .sort(() => Math.random() - 0.5)
+              .slice(0, 5)
+
+            const filmDetails = await Promise.all(
+              freshFilms.map(async (f: any) => {
+                const res = await fetch(
+                  `https://api.themoviedb.org/3/movie/${f.id}?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&append_to_response=credits`
+                )
+                const data = await res.json()
+                const director = data.credits?.crew?.find((c: any) => c.job === 'Director')?.name || ''
+                const cast = data.credits?.cast?.slice(0, 3).map((c: any) => c.name) || []
+                const streaming = await fetchStreaming(data.id)
+                return {
+                  film: {
+                    id: data.id,
+                    title: data.title,
+                    year: data.release_date?.slice(0, 4),
+                    poster: data.poster_path,
+                    genres: data.genres?.map((g: any) => g.name) || [],
+                    director,
+                    tmdbRating: Math.round(data.vote_average * 10) / 10,
+                    streaming,
+                    synopsis: data.overview || '',
+                    cast,
+                    runtime: data.runtime || 0,
+                    language: data.original_language?.toUpperCase() || ''
+                  },
+                  score: 0,
+                  groupScore: 0,
+                  breakdown: [],
+                  lowestScore: 0,
+                  watchLaterCount: 0,
+                }
+              })
+            )
+
+            setResults(filmDetails)
+            const { data: participants } = await supabase
+              .from('participants')
+              .select('*')
+              .eq('session_id', id)
+            if (participants) {
+              const summary = await generateGroupSummary(participants, filmDetails, sessionData?.mode || 'rated', genres)
+              setGroupSummary(summary)
+            }
+            setLoading(false)
           }}
           className="w-full border border-gray-700 text-gray-300 py-3 rounded-xl text-sm hover:bg-gray-800 transition-all"
         >
