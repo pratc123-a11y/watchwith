@@ -848,14 +848,6 @@ async function markWatched(film: Film) {
             )
 
             setResults(filmDetails)
-            const { data: participants } = await supabase
-              .from('participants')
-              .select('*')
-              .eq('session_id', id)
-            if (participants) {
-              const summary = await generateGroupSummary(participants, filmDetails, sessionData?.mode || 'rated', genres)
-              setGroupSummary(summary)
-            }
             setLoading(false)
           }}
           className="w-full border border-gray-700 text-gray-300 py-3 rounded-xl text-sm hover:bg-gray-800 transition-all"
