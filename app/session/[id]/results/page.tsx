@@ -685,7 +685,7 @@ async function markWatched(film: Film) {
           {expandedFilm === result.film.id && (
             <div className="px-4 pb-4 border-t border-gray-700 pt-4">
               {result.film.tagline && (
-                <p className="text-sm text-purple-300 italic font-medium mb-2">"{result.film.tagline}"</p>
+                <p className="text-sm text-purple-300 italic font-bold mb-2">"{result.film.tagline}"</p>
               )}
               {result.film.synopsis && (
                 <p className="text-sm text-gray-100 leading-relaxed mb-4">{result.film.synopsis}</p>
