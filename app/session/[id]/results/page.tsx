@@ -18,6 +18,7 @@ type Film = {
   tmdbRating: number
   streaming: {name: string, logo: string, link: string}[]
   synopsis: string
+  tagline: string
   cast: string[]
   runtime: number
   language: string
@@ -228,6 +229,7 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
           tmdbRating: Math.round(data.vote_average * 10) / 10,
           streaming,
           synopsis: data.overview || '',
+          tagline: data.tagline || '',
           cast,
           runtime: data.runtime || 0,
           language: data.original_language?.toUpperCase() || ''
@@ -307,6 +309,7 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
           tmdbRating: Math.round(data.vote_average * 10) / 10,
           streaming,
           synopsis: data.overview || '',
+          tagline: data.tagline || '',
           cast,
           runtime: data.runtime || 0,
           language: data.original_language?.toUpperCase() || ''
@@ -432,6 +435,7 @@ const filmGenreNames = film.genres.map((g: any) =>
               tmdbRating: Math.round(data.vote_average * 10) / 10,
               streaming,
               synopsis: data.overview || '',
+              tagline: data.tagline || '',
               cast,
               runtime: data.runtime || 0,
               language: data.original_language?.toUpperCase() || ''
@@ -680,6 +684,9 @@ async function markWatched(film: Film) {
           </div>
           {expandedFilm === result.film.id && (
             <div className="px-4 pb-4 border-t border-gray-700 pt-4">
+              {result.film.tagline && (
+                <p className="text-sm text-purple-300 italic font-medium mb-2">"{result.film.tagline}"</p>
+              )}
               {result.film.synopsis && (
                 <p className="text-sm text-gray-100 leading-relaxed mb-4">{result.film.synopsis}</p>
               )}
