@@ -142,7 +142,7 @@ export default function Home() {
     )
   }
 
-  async function createSession() {
+  async function createSession(solo: boolean = false) {
     setLoading(true)
     const id = generateId()
     let films = selectedGenres.length > 0
@@ -170,7 +170,8 @@ export default function Home() {
       films: [],
       film_list: films,
       mode: 'rated',
-      genres: selectedGenreNames
+      genres: selectedGenreNames,
+      solo
     })
     router.push(`/session/${id}`)
   }
@@ -296,13 +297,22 @@ export default function Home() {
             </button>
           )}
 
-          <button
-            onClick={createSession}
-            disabled={loading}
-            className="w-full bg-purple-700 hover:bg-purple-600 text-white py-3 rounded-xl font-medium disabled:opacity-40 transition-all text-sm"
-          >
-            {loading ? 'Setting up...' : selectedGenres.length > 0 ? 'Start session' : 'Start session — any genre'}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => createSession(false)}
+              disabled={loading}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white py-3 rounded-xl font-medium disabled:opacity-40 transition-all text-sm"
+            >
+              {loading ? 'Setting up...' : '🎬 Start group session'}
+            </button>
+            <button
+              onClick={() => createSession(true)}
+              disabled={loading}
+              className="w-full border border-purple-700 text-purple-300 hover:bg-purple-900 py-3 rounded-xl font-medium disabled:opacity-40 transition-all text-sm"
+            >
+              {loading ? 'Setting up...' : '🎯 Just for me'}
+            </button>
+          </div>
         </div>
 
         {user ? (

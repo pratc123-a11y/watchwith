@@ -115,6 +115,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [resultsReady, setResultsReady] = useState(false)
   const [userParticipant, setUserParticipant] = useState<any>(null)
   const [checkingStatus, setCheckingStatus] = useState(true)
+  const [solo, setSolo] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -159,10 +160,19 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     })
   }, [])
 
+  useEffect(() => {
+    if (solo && films.length > 0 && !joined) {
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        const autoName = user?.user_metadata?.username || 'You'
+        joinSession(autoName)
+      })
+    }
+  }, [solo, films])
+
   async function fetchFilms() {
     const { data } = await supabase
       .from('sessions')
-      .select('film_list, mode, genres, results_ready')
+      .select('film_list, mode, genres, results_ready, solo')
       .eq('id', id)
       .single()
     if (data?.film_list) setFilms(data.film_list)
@@ -172,6 +182,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
     if (data?.genres) setSessionGenres(data.genres)
     if (data?.results_ready) setResultsReady(true)
+    if (data?.solo) setSolo(true)
   }
 
   async function fetchParticipants() {
@@ -208,8 +219,10 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  async function joinSession() {
-    if (!name.trim()) return
+  async function joinSession(autoName?: string) {
+    const joinName = autoName || name
+    if (!joinName.trim()) return
+    if (autoName) setName(autoName)
     setCheckingStatus(false)
     setJoined(true)
     await fetchPastRatings()
@@ -244,6 +257,14 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       if (ratingRows.length > 0) {
         await supabase.from('user_ratings').upsert(ratingRows, { onConflict: 'user_id,film_id' })
       }
+    }
+    if (solo) {
+      await supabase
+        .from('sessions')
+        .update({ results_ready: true })
+        .eq('id', id)
+      window.location.href = `/session/${id}/results`
+      return
     }
     setDone(true)
     fetchParticipants()
@@ -397,7 +418,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           </a>
         )}
         <button
-          onClick={joinSession}
+          onClick={() => joinSession()}
           disabled={!name.trim()}
           className="w-full bg-purple-700 text-white py-3 rounded-xl font-medium disabled:opacity-40 mb-3"
         >
@@ -415,8 +436,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   return (
     <main className="min-h-screen p-8 max-w-lg mx-auto">
-      <h1 className="text-2xl font-medium mb-1">Hey {name}!</h1>
-      <p className="text-gray-500 mb-2">Rate these films honestly</p>
+      <h1 className="text-2xl font-medium mb-1">
+        {solo ? 'What are you in the mood for?' : `Hey ${name}!`}
+      </h1>
+      <p className="text-gray-500 mb-2">
+        {solo ? 'Rate these films and we\'ll find your perfect pick' : 'Rate these films honestly'}
+      </p>
       <p className="text-sm text-gray-400 mb-8">{Object.keys(votes).length} of {films.length} rated</p>
       {films.length === 0 ? (
         <div className="text-center text-gray-400 py-16">Loading films...</div>

@@ -47,6 +47,7 @@ export default function ResultsPage({ params }: { params: Promise<{ id: string }
   const [sessionMode, setSessionMode] = useState<string | null>(null)
   const [sessionGenres, setSessionGenres] = useState<string[]>([])
   const [groupSummary, setGroupSummary] = useState<string>('')
+  const [solo, setSolo] = useState(false)
   const [expandedFilm, setExpandedFilm] = useState<number | null>(null)
   const [watchedFilms, setWatchedFilms] = useState<Set<number>>(new Set())
   const [userRatedIds, setUserRatedIds] = useState<Set<number>>(new Set())
@@ -249,9 +250,11 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
   async function fetchAndScore() {
     const { data: sessionData } = await supabase
       .from('sessions')
-      .select('mode, genres')
+      .select('mode, genres, solo')
       .eq('id', id)
       .single()
+
+    if (sessionData?.solo) setSolo(true)
 
     const mode = sessionData?.mode || 'rated'
     const genres: string[] = sessionData?.genres || []
@@ -581,12 +584,14 @@ async function markWatched(film: Film) {
   return (
     <main className="min-h-screen p-8 max-w-md mx-auto">
       <h1 className="text-2xl font-medium mb-1">
-        {sessionMode === 'unseen' ? 'Something new to discover' : 'Best matches'}
+        {solo ? 'Your picks tonight' : sessionMode === 'unseen' ? 'Something new to discover' : 'Best matches'}
       </h1>
       <p className="text-gray-100 mb-2">
-        {participants.length === 1
-          ? `Personal picks for ${participants[0]?.name}`
-          : `Based on ${participants.length} people — ${participants.map(p => p.name).join(', ')}`}
+        {solo
+          ? 'Based on your taste and tonight\'s mood'
+          : participants.length === 1
+            ? `Personal picks for ${participants[0]?.name}`
+            : `Based on ${participants.length} people — ${participants.map(p => p.name).join(', ')}`}
       </p>
       {sessionMode === 'unseen' && (
         <p className="text-xs text-gray-200 mb-4">
@@ -602,7 +607,7 @@ async function markWatched(film: Film) {
           ))}
         </div>
       )}
-      {groupSummary && (
+     {groupSummary && !solo && (
         <p className="text-sm text-gray-200 italic mb-8 leading-relaxed">{groupSummary}</p>
       )}
 
