@@ -346,11 +346,11 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
 const filmGenreNames = film.genres.map((g: any) =>
         typeof g === 'string' ? g : g.name
       )
-      const genreMatch = sessionGenres.length === 0 ||
-        filmGenreNames.some((g: string) => sessionGenres.includes(g))
+      const genreMatch = genres.length === 0 ||
+        filmGenreNames.some((g: string) => genres.includes(g))
 
-      if (sessionGenres.length > 0 && !genreMatch) {
-        console.log(`Excluded ${film.title} — genres: ${filmGenreNames.join(', ')} don't match ${sessionGenres.join(', ')}`)
+      if (genres.length > 0 && !genreMatch) {
+        console.log(`Excluded ${film.title} — genres: ${filmGenreNames.join(', ')} don't match ${genres.join(', ')}`)
         continue
       }
 
@@ -378,7 +378,7 @@ const filmGenreNames = film.genres.map((g: any) =>
     const top5 = shuffled.slice(0, 5)
 
     setResults(top5)
-    const summary = await generateGroupSummary(participantData, top5, mode, sessionGenres)
+    const summary = await generateGroupSummary(participantData, top5, mode, genres)
     setGroupSummary(summary)
     if (top5.length > 0) saveSessionHistory(participantData, top5[0], mode, genres)
     setLoading(false)
