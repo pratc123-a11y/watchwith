@@ -391,7 +391,7 @@ const filmGenreNames = film.genres.map((g: any) =>
         'Sci-Fi': 878, 'Thriller': 53, 'War': 10752
       }
       const genreIds = genres.map(g => genreMap[g]).filter(Boolean).join(',')
-      const page = Math.floor(Math.random() * 5) + 1
+      const page = Math.floor(Math.random() * 12) + 1
       const res = await fetch(
         `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&with_genres=${genreIds}&sort_by=vote_average.desc&vote_count.gte=500&page=${page}`
       )

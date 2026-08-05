@@ -34,7 +34,7 @@ async function fetchFilmsForGenres(genreIds: number[]) {
   const perGenre = Math.ceil(12 / genreIds.length)
   const genreResults = await Promise.all(
     genreIds.map(async (genreId) => {
-      const page = Math.floor(Math.random() * 3) + 1
+      const page = Math.floor(Math.random() * 10) + 1
       const res = await fetch(
         `https://api.themoviedb.org/3/discover/movie?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&with_genres=${genreId}&sort_by=vote_average.desc&vote_count.gte=500&page=${page}`
       )
@@ -67,7 +67,7 @@ async function fetchFilmsForGenres(genreIds: number[]) {
 }
 
 async function fetchRandomFilms() {
-  const page = Math.floor(Math.random() * 5) + 1
+  const page = Math.floor(Math.random() * 15) + 1
   const res = await fetch(
     `https://api.themoviedb.org/3/movie/top_rated?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}&page=${page}`
   )
