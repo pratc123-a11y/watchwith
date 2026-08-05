@@ -834,6 +834,7 @@ async function markWatched(film: Film) {
                     tmdbRating: Math.round(data.vote_average * 10) / 10,
                     streaming,
                     synopsis: data.overview || '',
+              tagline: data.tagline || '',
                     cast,
                     runtime: data.runtime || 0,
                     language: data.original_language?.toUpperCase() || ''
