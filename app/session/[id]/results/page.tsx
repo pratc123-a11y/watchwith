@@ -346,11 +346,13 @@ Write ONE sentence (max 25 words) summarising what this group has in common tast
 const filmGenreNames = film.genres.map((g: any) =>
         typeof g === 'string' ? g : g.name
       )
+      const primaryGenre = filmGenreNames[0]
       const genreMatch = genres.length === 0 ||
-        filmGenreNames.some((g: string) => genres.includes(g))
+        genres.includes(primaryGenre) ||
+        (filmGenreNames.length > 1 && genres.includes(filmGenreNames[1]))
 
       if (genres.length > 0 && !genreMatch) {
-        console.log(`Excluded ${film.title} — genres: ${filmGenreNames.join(', ')} don't match ${genres.join(', ')}`)
+        console.log(`Excluded ${film.title} — primary genre ${primaryGenre} doesn't match ${genres.join(', ')}`)
         continue
       }
 
